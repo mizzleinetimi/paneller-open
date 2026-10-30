@@ -112,11 +112,13 @@ function BubbleShape({
             y: Math.min(Math.max(pos.y, margin * scale), (page.height - margin) * scale),
           };
         }}
-        onDragEnd={(e) => {
-          const moved = { x: e.target.x(), y: e.target.y() };
-          const shift = tail ? { tail: { x: tail.x + (moved.x - x), y: tail.y + (moved.y - y) } } : {};
-          updateBubble(id, { ...moved, ...shift });
-        }}
+        // The tail is anchored to whoever is speaking, so it stays where it is
+        // and the balloon re-forms around it: move the balloon and the tail
+        // stretches, turns and re-curves to keep pointing at the same head.
+        // Updating live rather than on drop is what makes that visible while
+        // dragging instead of snapping into place afterwards.
+        onDragMove={(e) => updateBubble(id, { x: e.target.x(), y: e.target.y() }, true)}
+        onDragEnd={(e) => updateBubble(id, { x: e.target.x(), y: e.target.y() })}
       >
         {kind === "speech" && (
           <Shape

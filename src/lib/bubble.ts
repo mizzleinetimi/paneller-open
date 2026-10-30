@@ -141,7 +141,10 @@ type Ctx = {
  * to the left hooks the opposite way to one on the right.
  */
 export function balloonPath(ctx: Ctx, rx: number, ry: number, tail?: { x: number; y: number }): void {
-  if (!tail) {
+  const reach = tail ? Math.hypot(tail.x, tail.y) : 0;
+  // A tip dragged inside the balloon, or a balloon grown out over its own tip,
+  // has no tail to draw: anything else would be a spur on the outline.
+  if (!tail || reach < Math.min(rx, ry) * 1.08) {
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
     ctx.closePath();
@@ -149,7 +152,6 @@ export function balloonPath(ctx: Ctx, rx: number, ry: number, tail?: { x: number
   }
 
   const angle = Math.atan2(tail.y, tail.x);
-  const reach = Math.hypot(tail.x, tail.y);
   // A long tail leaves the balloon from a narrower base, as a drawn one does.
   const spread = Math.max(0.17, 0.42 - reach / Math.max(rx, ry) / 14);
 
