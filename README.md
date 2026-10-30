@@ -11,6 +11,11 @@ Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
 
 ## What it does
 
+- **Make a page from an idea.** Say what happens; Muse Spark plans the panels
+  and writes the dialogue, Muse Image draws the page, and SAM 3.1 reads it
+  straight back into panels and bubbles you can edit. About a minute, and
+  nothing is baked in: every panel is yours to redraw and every line yours to
+  change.
 - **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
   effects. Drag to move, type to letter, undo a hundred steps deep.
 - **Read a page.** SAM 3.1 finds the panels and bubbles on any page — including

@@ -16,6 +16,51 @@ const button =
   "rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700";
 
 const LANGUAGES = ["Yoruba", "Spanish", "Japanese", "French", "Arabic", "Hindi", "Portuguese"];
+const STYLE_NAMES = ["classic", "manga", "noir", "soft"];
+
+function DrawPage({ busy, onDraw, onClose }: { busy: boolean; onDraw: (idea: string, panels: number, style: string) => void; onClose: () => void }) {
+  const [idea, setIdea] = useState("");
+  const [panels, setPanels] = useState(4);
+  const [style, setStyle] = useState("classic");
+  return (
+    <div className="absolute left-0 right-0 top-full z-10 border-b border-neutral-200 bg-white p-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="mx-auto flex max-w-2xl flex-col gap-3">
+        <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">What happens on this page?</label>
+        <textarea
+          autoFocus
+          value={idea}
+          onChange={(e) => setIdea(e.target.value)}
+          rows={2}
+          placeholder="a danfo driver in Lagos traffic argues with a conductor, then spots his old teacher through the window"
+          className="w-full resize-none rounded-md border border-neutral-300 bg-white p-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-neutral-500">
+            Panels
+            <select className={`${button} ml-2`} value={panels} onChange={(e) => setPanels(Number(e.target.value))}>
+              {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-neutral-500">
+            Style
+            <select className={`${button} ml-2`} value={style} onChange={(e) => setStyle(e.target.value)}>
+              {STYLE_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <span className="flex-1" />
+          <button className={button} onClick={onClose}>Cancel</button>
+          <button className={button} onClick={() => idea.trim() && onDraw(idea.trim(), panels, style)} disabled={busy || !idea.trim()}>
+            {busy ? "Drawing..." : "Draw the page"}
+          </button>
+        </div>
+        <p className="text-xs text-neutral-500">
+          Muse Spark plans the panels and the dialogue, Muse Image draws the page, SAM reads it
+          back into parts you can edit. About a minute.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function PanelInspector({ busy, onRedraw }: { busy: boolean; onRedraw: (prompt: string) => void }) {
   const [prompt, setPrompt] = useState("");
@@ -91,6 +136,7 @@ export default function Editor() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<string | null>(null);
+  const [drawing, setDrawing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const { addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage } = useEditor();
 
@@ -189,6 +235,21 @@ export default function Editor() {
     else if (out?.art) useEditor.getState().updatePanel(panel.id, { art: { src: out.art, ...boundsOf(panel.shape) } });
   };
 
+  const drawNewPage = async (idea: string, panels: number, style: string) => {
+    const out = await call<{ image: string; panels: typeof page.panels; bubbles: typeof page.bubbles }>(
+      "Planning, drawing and reading the page...",
+      "/api/page",
+      { idea, panels, style },
+    );
+    if (!out) return;
+    const img = new window.Image();
+    img.onload = () => {
+      useEditor.getState().openPage(out.image, img.naturalWidth, img.naturalHeight, out);
+      setDrawing(false);
+    };
+    img.src = out.image;
+  };
+
   const exportPng = () => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -201,7 +262,7 @@ export default function Editor() {
 
   return (
     <div className="flex h-dvh flex-col bg-neutral-100 dark:bg-neutral-950">
-      <header className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+      <header className="relative flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
         <span className="mr-2 font-semibold tracking-tight">Paneller <span className="font-normal text-neutral-500">Open</span></span>
         <input
           ref={fileRef}
@@ -213,6 +274,9 @@ export default function Editor() {
             e.target.value = "";
           }}
         />
+        <button className={button} onClick={() => setDrawing((d) => !d)} disabled={Boolean(reading)}>
+          Draw a page
+        </button>
         <button className={button} onClick={() => fileRef.current?.click()} disabled={Boolean(reading)}>
           Open a page
         </button>
@@ -242,6 +306,13 @@ export default function Editor() {
         {reading && <span className="text-sm text-neutral-500">{reading}</span>}
         {problem && <span className="text-sm text-red-600 dark:text-red-400">{problem}</span>}
         <button className={button} onClick={exportPng}>Export PNG</button>
+        {drawing && (
+          <DrawPage
+            busy={Boolean(reading)}
+            onDraw={(idea, panels, style) => void drawNewPage(idea, panels, style)}
+            onClose={() => setDrawing(false)}
+          />
+        )}
       </header>
 
       <div className="flex min-h-0 flex-1">
