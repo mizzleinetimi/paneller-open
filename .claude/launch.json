@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "panelmu",
+      "name": "paneller-open",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 3000

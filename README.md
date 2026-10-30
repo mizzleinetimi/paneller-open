@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Paneller Open
 
-## Getting Started
+An open-source comic page editor, with the AI parts powered by Meta's models.
 
-First, run the development server:
+Draw a page, or bring one you already have. **Paneller Open reads a comic page
+back into its parts** — every panel, every speech bubble, every sound effect —
+using SAM 3.1, so a flat image becomes something you can actually edit. Panels
+are polygons, so slanted and irregular layouts work, not just grids.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
+
+## What it does
+
+- **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
+  effects. Drag to move, type to letter, undo a hundred steps deep.
+- **Read a page.** SAM 3.1 finds the panels and bubbles on any page — including
+  ones you didn't make — and turns them into editable objects.
+- **Draw a page.** Muse Image draws panel art from a prompt, or redraws a single
+  panel without touching the rest of the page.
+- **Letter it in another language.** Translate a bubble's text to fit the bubble
+  it has to sit in.
+
+No account, no server, no database. The document lives in your browser and
+exports to PNG.
+
+## Why the models matter here
+
+A comic page isn't an image. It's panels, gutters, bubbles, reading order,
+lettering and art, and each of those is a region with meaning. Image models
+flatten all of it into pixels. Segmentation gives the structure back, which is
+what makes the page editable rather than merely re-generatable.
+
+The wording of a segmentation prompt decides whether it finds anything at all —
+`speech bubble` scores 0.96 where `word balloon` finds nothing. What works and
+what doesn't is written down in [docs/CONCEPTS.md](docs/CONCEPTS.md).
+
+## Running it
+
+```sh
+pnpm install
+cp .env.example .env.local   # add a Meta Model API key from https://dev.meta.ai
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Reading a page costs about $0.0075 (three segmentation calls). Drawing one is
+$0.01 an image.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Using it in your own app
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The pieces are separable, and deliberately so:
 
-## Learn More
+| Module | What it gives you |
+|---|---|
+| `src/lib/meta/client.ts` | Muse Image: generate, edit, compose |
+| `src/lib/meta/sam.ts` | SAM 3.1 segmentation, streaming, parsed |
+| `src/lib/doc.ts` | The page model: polygon panels, bubbles |
+| `src/components/` | The editor itself |
 
-To learn more about Next.js, take a look at the following resources:
+## Related
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Paneller Open is the open editor. [Paneller](https://panellr.com) is the full
+product: multi-character consistency, whole comics, and everything drawn for
+you. This editor's reading and lettering work runs inside it.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Licence
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Apache-2.0.

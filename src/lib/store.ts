@@ -17,7 +17,7 @@ import {
   newBubble,
 } from "./doc";
 
-const SAVE_KEY = "panelmu.doc";
+const SAVE_KEY = "paneller-open.doc";
 const LIMIT = 100;
 
 type State = {

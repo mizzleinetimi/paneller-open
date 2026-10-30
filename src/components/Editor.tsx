@@ -89,7 +89,7 @@ export default function Editor() {
   return (
     <div className="flex h-dvh flex-col bg-neutral-100 dark:bg-neutral-950">
       <header className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-        <span className="mr-2 font-semibold tracking-tight">panelmu</span>
+        <span className="mr-2 font-semibold tracking-tight">Paneller <span className="font-normal text-neutral-500">Open</span></span>
         <button className={button} onClick={() => addBubble("speech")}>Speech</button>
         <button className={button} onClick={() => addBubble("caption")}>Caption</button>
         <button className={button} onClick={() => addBubble("sfx")}>Sound effect</button>
@@ -103,11 +103,24 @@ export default function Editor() {
 
       <div className="flex min-h-0 flex-1">
         <main className="min-w-0 flex-1">{loaded ? <Canvas stageRef={stageRef} /> : null}</main>
-        <aside className="w-72 shrink-0 border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <aside className="flex w-72 shrink-0 flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="p-3 text-xs text-neutral-500">
             Click a panel or a bubble to select it. Drag to move. Cmd+Z undoes.
           </div>
           <Inspector />
+          <div className="mt-auto border-t border-neutral-200 p-3 text-xs text-neutral-500 dark:border-neutral-800">
+            Want the whole comic drawn for you, with your characters kept
+            consistent across pages?{" "}
+            <a
+              href="https://panellr.com"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-blue-600 underline underline-offset-2 dark:text-blue-400"
+            >
+              Paneller
+            </a>{" "}
+            does that. This editor is its open core.
+          </div>
         </aside>
       </div>
     </div>
