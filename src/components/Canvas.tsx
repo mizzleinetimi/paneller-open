@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Circle, Ellipse, Group, Image as KImage, Layer, Line, Rect, Stage, Text } from "react-konva";
+import { Circle, Group, Image as KImage, Layer, Line, Rect, Shape, Stage, Text } from "react-konva";
 import type Konva from "konva";
-import { FAMILY, measure } from "@/lib/bubble";
+import { FAMILY, balloonPath, measure } from "@/lib/bubble";
 import { type Bubble, type Panel, bounds, flatten } from "@/lib/doc";
 import { useEditor } from "@/lib/store";
 
@@ -70,13 +70,18 @@ function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: b
   );
 }
 
-/** Where a ray from the centre at `angle` leaves the ellipse. */
-const onEllipse = (cx: number, cy: number, rx: number, ry: number, angle: number) => ({
-  x: cx + rx * Math.cos(angle),
-  y: cy + ry * Math.sin(angle),
-});
-
-function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }) {
+function BubbleShape({
+  bubble,
+  selected,
+  scale,
+  page,
+}: {
+  bubble: Bubble;
+  selected: boolean;
+  /** The stage's zoom, so handles stay the same size on screen at any zoom. */
+  scale: number;
+  page: { width: number; height: number };
+}) {
   const { select, updateBubble } = useEditor();
   const { id, kind, x, y, text, fontSize, tail, clear } = bubble;
   const pick = () => select({ kind: "bubble", id });
@@ -87,20 +92,8 @@ function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }
   const height = bubble.height ?? measured.height;
   const body = measured.lines.join("\n");
 
-  // The tail is drawn before the balloon, so the balloon covers where it joins
-  // and the outline reads as one shape rather than a triangle stuck on.
-  const tailPoints = (() => {
-    if (kind !== "speech" || !tail) return null;
-    const dx = tail.x - x;
-    const dy = tail.y - y;
-    const angle = Math.atan2(dy, dx);
-    const spread = 0.34;
-    const rx = width / 2;
-    const ry = height / 2;
-    const a = onEllipse(0, 0, rx, ry, angle - spread);
-    const b = onEllipse(0, 0, rx, ry, angle + spread);
-    return [a.x, a.y, dx, dy, b.x, b.y];
-  })();
+  // Balloon and tail are one closed path, so there is no seam where they meet.
+  const localTail = tail ? { x: tail.x - x, y: tail.y - y } : undefined;
 
   return (
     <>
@@ -110,21 +103,35 @@ function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }
         y={y}
         onMouseDown={pick}
         onTap={pick}
+        dragBoundFunc={(pos) => {
+          // Keep it on the page: a bubble dragged off the edge is gone for good
+          // at this zoom, with nothing left to grab.
+          const margin = 24;
+          return {
+            x: Math.min(Math.max(pos.x, margin * scale), (page.width - margin) * scale),
+            y: Math.min(Math.max(pos.y, margin * scale), (page.height - margin) * scale),
+          };
+        }}
         onDragEnd={(e) => {
           const moved = { x: e.target.x(), y: e.target.y() };
           const shift = tail ? { tail: { x: tail.x + (moved.x - x), y: tail.y + (moved.y - y) } } : {};
           updateBubble(id, { ...moved, ...shift });
         }}
       >
-        {tailPoints && <Line points={tailPoints} closed fill="#ffffff" stroke="#111111" strokeWidth={4} />}
-
         {kind === "speech" && (
-          <Ellipse
-            radiusX={width / 2}
-            radiusY={height / 2}
+          <Shape
+            sceneFunc={(ctx, shape) => {
+              balloonPath(ctx, width / 2, height / 2, localTail);
+              ctx.fillStrokeShape(shape);
+            }}
+            hitFunc={(ctx, shape) => {
+              balloonPath(ctx, width / 2, height / 2, localTail);
+              ctx.fillStrokeShape(shape);
+            }}
             fill="#ffffff"
             stroke={selected ? "#2563eb" : "#111111"}
             strokeWidth={selected ? 6 : 4}
+            lineJoin="round"
           />
         )}
         {kind === "caption" && (
@@ -169,10 +176,11 @@ function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }
         <Circle
           x={tail.x}
           y={tail.y}
-          radius={14}
+          radius={11 / scale}
+          hitStrokeWidth={22 / scale}
           fill="#2563eb"
           stroke="#ffffff"
-          strokeWidth={3}
+          strokeWidth={3 / scale}
           draggable
           onDragMove={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } }, true)}
           onDragEnd={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } })}
@@ -223,7 +231,13 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
             />
           ))}
           {page.bubbles.map((bubble) => (
-            <BubbleShape key={bubble.id} bubble={bubble} selected={selection?.kind === "bubble" && selection.id === bubble.id} />
+            <BubbleShape
+              key={bubble.id}
+              bubble={bubble}
+              scale={scale}
+              page={page}
+              selected={selection?.kind === "bubble" && selection.id === bubble.id}
+            />
           ))}
         </Layer>
       </Stage>

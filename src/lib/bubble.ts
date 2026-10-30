@@ -114,3 +114,67 @@ export function boxOf(bubble: Parameters<typeof sizeOf>[0] & { x: number; y: num
   const { width, height } = sizeOf(bubble);
   return { left: bubble.x - width / 2, top: bubble.y - height / 2, width, height };
 }
+
+// ─── The balloon outline ────────────────────────────────────
+
+type Ctx = {
+  beginPath(): void;
+  closePath(): void;
+  ellipse(x: number, y: number, rx: number, ry: number, rotation: number, start: number, end: number, anti?: boolean): void;
+  quadraticCurveTo(cx: number, cy: number, x: number, y: number): void;
+};
+
+/**
+ * Traces a balloon and its tail as **one** closed path, in bubble-local
+ * coordinates with the centre at 0,0.
+ *
+ * One path matters: drawing the tail and the balloon separately leaves the
+ * balloon's own outline painted across the base of the tail, and the tail then
+ * reads as a triangle stuck onto a circle rather than part of the same shape.
+ * Here the outline goes round the ellipse, out along one side of the tail to
+ * the tip, and back along the other, so there is nothing to seam.
+ *
+ * The two sides of the tail are curves bending the same way, which is what
+ * makes it look drawn rather than folded: a tail with straight edges is a
+ * wedge, and no letterer draws a wedge. How far it bends grows with how far
+ * the tail reaches, and the direction follows where it is pointing, so a tail
+ * to the left hooks the opposite way to one on the right.
+ */
+export function balloonPath(ctx: Ctx, rx: number, ry: number, tail?: { x: number; y: number }): void {
+  if (!tail) {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.closePath();
+    return;
+  }
+
+  const angle = Math.atan2(tail.y, tail.x);
+  const reach = Math.hypot(tail.x, tail.y);
+  // A long tail leaves the balloon from a narrower base, as a drawn one does.
+  const spread = Math.max(0.17, 0.42 - reach / Math.max(rx, ry) / 14);
+
+  const at = (a: number) => ({ x: rx * Math.cos(a), y: ry * Math.sin(a) });
+  const from = at(angle + spread);
+  const to = at(angle - spread);
+
+  // Perpendicular to the line out to the tip; both edges lean the same way.
+  const ux = tail.x / (reach || 1);
+  const uy = tail.y / (reach || 1);
+  const lean = Math.min(reach * 0.16, Math.max(rx, ry) * 0.9);
+  const px = -uy * lean;
+  const py = ux * lean;
+
+  const bend = (ax: number, ay: number, bx: number, by: number) => ({
+    x: (ax + bx) / 2 + px,
+    y: (ay + by) / 2 + py,
+  });
+
+  ctx.beginPath();
+  // The long way round, leaving the gap the tail grows out of.
+  ctx.ellipse(0, 0, rx, ry, 0, angle + spread, angle - spread + Math.PI * 2);
+  const out = bend(to.x, to.y, tail.x, tail.y);
+  ctx.quadraticCurveTo(out.x, out.y, tail.x, tail.y);
+  const back = bend(tail.x, tail.y, from.x, from.y);
+  ctx.quadraticCurveTo(back.x, back.y, from.x, from.y);
+  ctx.closePath();
+}
