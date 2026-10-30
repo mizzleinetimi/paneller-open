@@ -36,6 +36,8 @@ export type Page = {
   width: number;
   height: number;
   background: string;
+  /** The page as it arrived, drawn under everything. Set when a page is read in. */
+  art?: string;
   panels: Panel[];
   bubbles: Bubble[];
 };

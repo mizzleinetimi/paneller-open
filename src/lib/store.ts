@@ -15,6 +15,7 @@ import {
   type Selection,
   emptyDoc,
   newBubble,
+  newId,
 } from "./doc";
 
 const SAVE_KEY = "paneller-open.doc";
@@ -40,6 +41,7 @@ type State = {
   addBubble: (kind: BubbleKind) => void;
   remove: (selection: NonNullable<Selection>) => void;
   setDoc: (doc: Doc) => void;
+  openPage: (art: string, width: number, height: number, found: { panels: Panel[]; bubbles: Bubble[] }) => void;
   restore: () => Promise<void>;
 };
 
@@ -131,6 +133,24 @@ export const useEditor = create<State>((set, get) => ({
   },
 
   setDoc: (doc) => get().commit(() => doc),
+
+  openPage: (art, width, height, found) => {
+    get().commit((doc) => ({
+      ...doc,
+      pages: [
+        {
+          id: newId("page"),
+          width,
+          height,
+          background: "#ffffff",
+          art,
+          panels: found.panels,
+          bubbles: found.bubbles,
+        },
+      ],
+    }));
+    set({ pageIndex: 0, selection: null });
+  },
 
   restore: async () => {
     const saved = await idbGet<Doc>(SAVE_KEY).catch(() => undefined);

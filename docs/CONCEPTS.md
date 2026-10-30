@@ -34,9 +34,26 @@ sound effect, a bus-stop sign and a route board.
   the box is the whole story. Masks earn their keep on slanted, irregular and
   full-bleed panels, and on bubbles, whose mask covers 63.5% of its box.
 
+## Concepts overlap, so the page needs a second pass
+
+`comic sound effect lettering` does not only find sound effects. On the test
+page it returned three hits: the real "SKRRRT!!!", and both speech bubbles, with
+boxes identical to the ones `speech bubble` returned. Each concept is asked in
+its own request and knows nothing of the others, so nothing stops two of them
+claiming the same pixels.
+
+`detectPage` resolves it by intersection over union: where a sound effect covers
+more than half the same area as a speech bubble, the sound effect is dropped,
+because speech is the surer reading (0.96 against 0.75-0.91). On the test page
+that turns 4 panels / 2 speech / 3 sound effects into 4 / 2 / 1, which is what
+is actually drawn there.
+
+Expect to need this for any new concept you add.
+
 ## Open
 
 - **Caption boxes** are not found by `caption box`. Try `rectangular text box`,
   `narration box`, `white box with text`.
 - Whether `comic panel` holds up on full-bleed pages with no gutters, which is
   exactly where a classical splitter gives up.
+- Reading the text inside a bubble. SAM returns the shape, never the words.

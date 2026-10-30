@@ -43,3 +43,6 @@ next-env.d.ts
 
 # spike output
 .spike/
+
+# dev-only sample pages
+public/dev/

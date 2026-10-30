@@ -25,7 +25,7 @@ function useImage(src: string | undefined) {
   return loaded && loaded.src === src ? loaded.img : undefined;
 }
 
-function PanelShape({ panel, selected }: { panel: Panel; selected: boolean }) {
+function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: boolean; hasPageArt: boolean }) {
   const { select, updatePanel } = useEditor();
   const art = useImage(panel.art?.src);
   const box = useMemo(() => bounds(panel.shape), [panel.shape]);
@@ -54,7 +54,7 @@ function PanelShape({ panel, selected }: { panel: Panel; selected: boolean }) {
           ctx.closePath();
         }}
       >
-        <Rect x={box.x} y={box.y} width={box.width} height={box.height} fill="#f1f1ef" />
+        {!hasPageArt && <Rect x={box.x} y={box.y} width={box.width} height={box.height} fill="#f1f1ef" />}
         {art && panel.art && (
           <KImage image={art} x={panel.art.x} y={panel.art.y} width={panel.art.width} height={panel.art.height} />
         )}
@@ -136,6 +136,7 @@ function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }
 export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.Stage | null> }) {
   const { selection, select } = useEditor();
   const page = useEditor((s) => s.doc.pages[s.pageIndex]);
+  const pageArt = useImage(page.art);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
 
@@ -163,8 +164,14 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
       >
         <Layer>
           <Rect width={page.width} height={page.height} fill={page.background} />
+          {pageArt && <KImage image={pageArt} width={page.width} height={page.height} listening={false} />}
           {page.panels.map((panel) => (
-            <PanelShape key={panel.id} panel={panel} selected={selection?.kind === "panel" && selection.id === panel.id} />
+            <PanelShape
+              key={panel.id}
+              panel={panel}
+              hasPageArt={Boolean(page.art)}
+              selected={selection?.kind === "panel" && selection.id === panel.id}
+            />
           ))}
           {page.bubbles.map((bubble) => (
             <BubbleShape key={bubble.id} bubble={bubble} selected={selection?.kind === "bubble" && selection.id === bubble.id} />

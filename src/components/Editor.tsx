@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import { useEditor } from "@/lib/store";
 
@@ -49,9 +49,50 @@ function Inspector() {
   );
 }
 
+/** Reads a file into a data URL and the pixel size of the image inside it. */
+function readImage(file: File): Promise<{ src: string; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.onload = () => {
+      const src = String(reader.result);
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("That file is not an image."));
+      img.onload = () => resolve({ src, width: img.naturalWidth, height: img.naturalHeight });
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Editor() {
   const stageRef = useRef<Konva.Stage | null>(null);
-  const { addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc } = useEditor();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage } = useEditor();
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setProblem(null);
+    setReading("Reading the page...");
+    try {
+      const { src, width, height } = await readImage(file);
+      const res = await fetch("/api/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: src }),
+      });
+      const found = await res.json();
+      if (!res.ok) throw new Error(found.error ?? "Could not read that page.");
+      openPage(src, width, height, found);
+      setReading(`Found ${found.counts.panels} panels, ${found.counts.speech} bubbles, ${found.counts.sfx} sound effects.`);
+      setTimeout(() => setReading(null), 6000);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not read that page.");
+      setReading(null);
+    }
+  };
 
   useEffect(() => {
     void restore();
@@ -90,6 +131,20 @@ export default function Editor() {
     <div className="flex h-dvh flex-col bg-neutral-100 dark:bg-neutral-950">
       <header className="flex flex-wrap items-center gap-2 border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
         <span className="mr-2 font-semibold tracking-tight">Paneller <span className="font-normal text-neutral-500">Open</span></span>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            void onFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <button className={button} onClick={() => fileRef.current?.click()} disabled={Boolean(reading)}>
+          Open a page
+        </button>
+        <span className="mx-1 h-5 w-px bg-neutral-300 dark:bg-neutral-700" />
         <button className={button} onClick={() => addBubble("speech")}>Speech</button>
         <button className={button} onClick={() => addBubble("caption")}>Caption</button>
         <button className={button} onClick={() => addBubble("sfx")}>Sound effect</button>
@@ -98,6 +153,8 @@ export default function Editor() {
         <button className={button} onClick={redo} disabled={!future.length}>Redo</button>
         <button className={button} onClick={() => selection && remove(selection)} disabled={!selection}>Delete</button>
         <span className="flex-1" />
+        {reading && <span className="text-sm text-neutral-500">{reading}</span>}
+        {problem && <span className="text-sm text-red-600 dark:text-red-400">{problem}</span>}
         <button className={button} onClick={exportPng}>Export PNG</button>
       </header>
 
