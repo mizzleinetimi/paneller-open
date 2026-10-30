@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Ellipse, Group, Image as KImage, Layer, Line, Rect, Stage, Text } from "react-konva";
+import { Circle, Ellipse, Group, Image as KImage, Layer, Line, Rect, Stage, Text } from "react-konva";
 import type Konva from "konva";
+import { FAMILY, measure } from "@/lib/bubble";
 import { type Bubble, type Panel, bounds, flatten } from "@/lib/doc";
 import { useEditor } from "@/lib/store";
 
@@ -69,68 +70,115 @@ function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: b
   );
 }
 
+/** Where a ray from the centre at `angle` leaves the ellipse. */
+const onEllipse = (cx: number, cy: number, rx: number, ry: number, angle: number) => ({
+  x: cx + rx * Math.cos(angle),
+  y: cy + ry * Math.sin(angle),
+});
+
 function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }) {
   const { select, updateBubble } = useEditor();
-  const { id, kind, x, y, width, height, text, fontSize, tail, clear } = bubble;
+  const { id, kind, x, y, text, fontSize, tail, clear } = bubble;
   const pick = () => select({ kind: "bubble", id });
 
+  // The text decides the size unless the reader has set one by hand.
+  const measured = useMemo(() => measure(text, kind, fontSize), [text, kind, fontSize]);
+  const width = bubble.width ?? measured.width;
+  const height = bubble.height ?? measured.height;
+  const body = measured.lines.join("\n");
+
+  // The tail is drawn before the balloon, so the balloon covers where it joins
+  // and the outline reads as one shape rather than a triangle stuck on.
+  const tailPoints = (() => {
+    if (kind !== "speech" || !tail) return null;
+    const dx = tail.x - x;
+    const dy = tail.y - y;
+    const angle = Math.atan2(dy, dx);
+    const spread = 0.34;
+    const rx = width / 2;
+    const ry = height / 2;
+    const a = onEllipse(0, 0, rx, ry, angle - spread);
+    const b = onEllipse(0, 0, rx, ry, angle + spread);
+    return [a.x, a.y, dx, dy, b.x, b.y];
+  })();
+
   return (
-    <Group
-      draggable
-      x={x}
-      y={y}
-      onMouseDown={pick}
-      onTap={pick}
-      onDragEnd={(e) => updateBubble(id, { x: e.target.x(), y: e.target.y() })}
-    >
-      {kind === "speech" && tail && (
-        <Line
-          points={[width * 0.3, height * 0.8, width * 0.5, height * 0.8, tail.x - x, tail.y - y]}
-          closed
-          fill="#ffffff"
-          stroke="#111111"
-          strokeWidth={4}
-        />
-      )}
-      {kind === "speech" && (
-        <Ellipse
-          x={width / 2}
-          y={height / 2}
-          radiusX={width / 2}
-          radiusY={height / 2}
-          fill="#ffffff"
-          stroke={selected ? "#2563eb" : "#111111"}
-          strokeWidth={selected ? 6 : 4}
-        />
-      )}
-      {kind === "sfx" && clear && text && <Rect width={width} height={height} fill={clear} />}
-      {kind === "caption" && (
-        <Rect
+    <>
+      <Group
+        draggable
+        x={x}
+        y={y}
+        onMouseDown={pick}
+        onTap={pick}
+        onDragEnd={(e) => {
+          const moved = { x: e.target.x(), y: e.target.y() };
+          const shift = tail ? { tail: { x: tail.x + (moved.x - x), y: tail.y + (moved.y - y) } } : {};
+          updateBubble(id, { ...moved, ...shift });
+        }}
+      >
+        {tailPoints && <Line points={tailPoints} closed fill="#ffffff" stroke="#111111" strokeWidth={4} />}
+
+        {kind === "speech" && (
+          <Ellipse
+            radiusX={width / 2}
+            radiusY={height / 2}
+            fill="#ffffff"
+            stroke={selected ? "#2563eb" : "#111111"}
+            strokeWidth={selected ? 6 : 4}
+          />
+        )}
+        {kind === "caption" && (
+          <Rect
+            x={-width / 2}
+            y={-height / 2}
+            width={width}
+            height={height}
+            fill="#fdf1c7"
+            stroke={selected ? "#2563eb" : "#111111"}
+            strokeWidth={selected ? 5 : 3}
+          />
+        )}
+        {kind === "sfx" && clear && text && (
+          <Rect x={-width / 2} y={-height / 2} width={width} height={height} fill={clear} />
+        )}
+
+        <Text
+          x={-width / 2}
+          y={-height / 2}
           width={width}
           height={height}
-          fill="#fdf6e3"
-          stroke={selected ? "#2563eb" : "#111111"}
-          strokeWidth={selected ? 6 : 4}
+          text={body}
+          align="center"
+          verticalAlign="middle"
+          lineHeight={1.22}
+          fontSize={fontSize}
+          fontStyle={kind === "sfx" ? "bold" : "normal"}
+          fontFamily={FAMILY[kind]}
+          fill={kind === "sfx" ? "#f5c518" : "#111111"}
+          stroke={kind === "sfx" ? "#111111" : undefined}
+          strokeWidth={kind === "sfx" ? 2.5 : 0}
+          listening={false}
+        />
+        {kind === "sfx" && selected && (
+          <Rect x={-width / 2} y={-height / 2} width={width} height={height} stroke="#2563eb" strokeWidth={4} dash={[10, 6]} />
+        )}
+      </Group>
+
+      {/* Drag the tip to aim the tail at whoever is speaking. */}
+      {selected && kind === "speech" && tail && (
+        <Circle
+          x={tail.x}
+          y={tail.y}
+          radius={14}
+          fill="#2563eb"
+          stroke="#ffffff"
+          strokeWidth={3}
+          draggable
+          onDragMove={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } }, true)}
+          onDragEnd={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } })}
         />
       )}
-      <Text
-        width={width}
-        height={height}
-        text={text}
-        align="center"
-        verticalAlign="middle"
-        padding={kind === "sfx" ? 0 : 18}
-        fontSize={fontSize}
-        fontStyle={kind === "sfx" ? "bold" : "normal"}
-        fontFamily={kind === "sfx" ? "Impact, system-ui" : "Comic Sans MS, system-ui"}
-        fill={kind === "sfx" ? "#f5c518" : "#111111"}
-        stroke={kind === "sfx" ? "#111111" : undefined}
-        strokeWidth={kind === "sfx" ? 2 : 0}
-      />
-      {kind === "sfx" && selected && (
-        <Rect width={width} height={height} stroke="#2563eb" strokeWidth={4} dash={[10, 6]} />
-      )}
-    </Group>
+    </>
   );
 }
 

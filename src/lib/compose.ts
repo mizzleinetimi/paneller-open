@@ -40,15 +40,20 @@ Leave out speech, sfx or caption where the panel has none.`;
   return plan;
 }
 
-/** The prompt that draws the planned page as one image. */
+/**
+ * The prompt that draws the planned page.
+ *
+ * Deliberately **no lettering**: the words go on afterwards as objects, so they
+ * stay editable, resizable and translatable instead of being pixels we would
+ * later have to paint over. It also leaves the model free to draw, which it is
+ * good at, rather than to spell, which it is unreliable at.
+ */
 export function pagePrompt(plan: PagePlan, style: string): string {
   const panels = plan.panels
     .map((p, i) => {
-      const parts = [`Panel ${i + 1}: ${p.description}`];
-      if (p.speech) parts.push(`A speech balloon reads "${p.speech}".`);
-      if (p.sfx) parts.push(`A large sound effect reads "${p.sfx}".`);
-      if (p.caption) parts.push(`A rectangular caption box reads "${p.caption}".`);
-      return parts.join(" ");
+      // Leave room where the lettering will go, without drawing any.
+      const room = p.speech || p.caption ? " Leave clear, uncluttered space in the upper part of this panel." : "";
+      return `Panel ${i + 1}: ${p.description}${room}`;
     })
     .join("\n");
 
@@ -58,7 +63,9 @@ Setting, the same in every panel: ${plan.setting}
 
 ${panels}
 
-${style} Draw the lettering exactly as quoted.`;
+${style}
+
+Important: draw artwork only. NO speech balloons, NO speech bubbles, NO caption boxes, NO sound effects, NO text, NO words, NO lettering, NO panel numbers, NO title. Every panel is pure illustration.`;
 }
 
 export const STYLES: Record<string, string> = {

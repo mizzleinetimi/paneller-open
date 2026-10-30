@@ -8,6 +8,7 @@ import "server-only";
 // crop knowing nothing else is in it, and we know which answer belongs where.
 
 import sharp from "sharp";
+import { boxOf } from "./bubble";
 import type { Bubble } from "./doc";
 import { type Part, askJson } from "./meta/text";
 
@@ -18,14 +19,15 @@ async function cropBubbles(page: Buffer, bubbles: Bubble[]): Promise<string[]> {
   const { width = 0, height = 0 } = await sharp(page).metadata();
   return Promise.all(
     bubbles.map(async (b) => {
-      const left = Math.max(0, Math.round(b.x) - PAD);
-      const top = Math.max(0, Math.round(b.y) - PAD);
+      const box = boxOf(b);
+      const left = Math.max(0, Math.round(box.left) - PAD);
+      const top = Math.max(0, Math.round(box.top) - PAD);
       const crop = await sharp(page)
         .extract({
           left,
           top,
-          width: Math.min(Math.round(b.width) + PAD * 2, width - left),
-          height: Math.min(Math.round(b.height) + PAD * 2, height - top),
+          width: Math.min(Math.round(box.width) + PAD * 2, width - left),
+          height: Math.min(Math.round(box.height) + PAD * 2, height - top),
         })
         .png()
         .toBuffer();

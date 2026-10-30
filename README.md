@@ -12,15 +12,20 @@ Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
 ## What it does
 
 - **Make a page from an idea.** Say what happens; Muse Spark plans the panels
-  and writes the dialogue, Muse Image draws the page, and SAM 3.1 reads it
-  straight back into panels and bubbles you can edit. About a minute, and
-  nothing is baked in: every panel is yours to redraw and every line yours to
-  change.
+  and writes the dialogue, Muse Image draws the art **clean, with no lettering
+  at all**, and the words go on top as objects. About a minute. Nothing is ever
+  baked in: the text was never pixels, so changing a line, resizing a balloon
+  or saying it in Yoruba is just changing it.
+- **Bubbles that size themselves.** A balloon is as big as what it says and no
+  bigger, re-wrapping as you type, and its tail aims at whoever is speaking -
+  SAM finds the people in each panel so the balloon sits clear of their face.
+  Drag the tip to aim it somewhere else.
 - **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
   effects. Drag to move, type to letter, undo a hundred steps deep.
-- **Read a page.** SAM 3.1 finds the panels and bubbles on any page — including
-  ones you didn't make — and turns them into editable objects, in reading order.
-- **Read the words.** Muse Spark reads the lettering out of each bubble.
+- **Open a page someone else drew.** Here the lettering *is* pixels, so SAM 3.1
+  finds the panels and bubbles, Muse Spark reads the words out of them, and the
+  page becomes editable after the fact. This is the harder path and the one the
+  benchmark measures.
 - **Letter it in another language.** Translated to fit the bubble it has to sit
   in, because a faithful rendering half as long again breaks the page. Sound
   effects come back as noise in the target language: "SKRRRT!!!" becomes

@@ -82,11 +82,13 @@ function overlap(a: Box, b: Box): number {
   return both / (area(a) + area(b) - both);
 }
 
+// A bubble read off a page keeps the size it was drawn at: the words already
+// fit it, and resizing to our own measurement would move them.
 const bubbleFrom = (kind: BubbleKind, box: Box, clear?: string): Bubble => ({
   id: newId("bubble"),
   kind,
-  x: box.left,
-  y: box.top,
+  x: (box.left + box.right) / 2,
+  y: (box.top + box.bottom) / 2,
   width: box.right - box.left,
   height: box.bottom - box.top,
   text: "",

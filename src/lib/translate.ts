@@ -7,13 +7,15 @@ import "server-only";
 // that runs 40% longer breaks the page. Yoruba and German both do that. So each
 // line is translated against a budget: roughly the room the original had.
 
+import { sizeOf } from "./bubble";
 import type { Bubble } from "./doc";
 import { askJson } from "./meta/text";
 
 /** Roughly how many characters fit, from the box and the type size. */
 function budget(b: Bubble): number {
-  const perLine = Math.max(6, Math.floor(b.width / (b.fontSize * 0.55)));
-  const lines = Math.max(1, Math.floor(b.height / (b.fontSize * 1.25)));
+  const { width, height } = sizeOf(b);
+  const perLine = Math.max(6, Math.floor(width / (b.fontSize * 0.55)));
+  const lines = Math.max(1, Math.floor(height / (b.fontSize * 1.25)));
   return perLine * lines;
 }
 

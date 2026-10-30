@@ -1,5 +1,6 @@
 import { drawPage } from "@/lib/compose";
 import { detectPage } from "@/lib/detect";
+import { letterPage } from "@/lib/letter";
 
 export const maxDuration = 300;
 
@@ -17,8 +18,17 @@ export async function POST(request: Request) {
     if (!idea?.trim()) return Response.json({ error: "Say what the page is about." }, { status: 400 });
 
     const { image, plan } = await drawPage(idea.trim(), { panels, style });
+    // The art is clean, so the only thing worth finding is the panels; the
+    // lettering is laid over them from the plan that drew them.
     const found = await detectPage(image);
-    return Response.json({ image, plan, ...found });
+    const bubbles = await letterPage(image, found.panels, plan);
+    return Response.json({
+      image,
+      plan,
+      panels: found.panels,
+      bubbles,
+      counts: { ...found.counts, lettered: bubbles.length },
+    });
   } catch (e) {
     console.error("/api/page failed:", e);
     return Response.json({ error: e instanceof Error ? e.message : "Could not draw that page." }, { status: 500 });

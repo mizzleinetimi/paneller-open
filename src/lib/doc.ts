@@ -21,12 +21,14 @@ export type BubbleKind = "speech" | "caption" | "sfx";
 export type Bubble = {
   id: string;
   kind: BubbleKind;
+  /** The bubble's centre, so that it grows evenly as its text changes. */
   x: number;
   y: number;
-  width: number;
-  height: number;
+  /** Set when the reader has sized it by hand; otherwise the text decides. */
+  width?: number;
+  height?: number;
   text: string;
-  /** Where the tail points, for speech. Absent means no tail. */
+  /** Where the tail points, in page coordinates. Absent means no tail. */
   tail?: Point;
   fontSize: number;
   /**
@@ -94,16 +96,13 @@ export function emptyPage(width = 1280, height = 1920): Page {
 export const emptyDoc = (): Doc => ({ title: "Untitled comic", pages: [emptyPage()] });
 
 export function newBubble(kind: BubbleKind, x: number, y: number): Bubble {
-  const size = kind === "sfx" ? 72 : 28;
   return {
     id: newId("bubble"),
     kind,
     x,
     y,
-    width: kind === "sfx" ? 360 : 260,
-    height: kind === "sfx" ? 110 : 140,
     text: kind === "sfx" ? "SKRRRT!" : kind === "caption" ? "Later that evening..." : "Say something.",
-    fontSize: size,
-    ...(kind === "speech" ? { tail: { x: x + 60, y: y + 190 } } : {}),
+    fontSize: kind === "sfx" ? 84 : 30,
+    ...(kind === "speech" ? { tail: { x: x + 40, y: y + 150 } } : {}),
   };
 }
