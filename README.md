@@ -23,6 +23,11 @@ Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
   look - "man in a green apron" - and SAM finds that person on the page, so the
   tail points at the speaker rather than at whoever happens to be biggest in
   the panel. Drag the tip to aim it somewhere else.
+- **Carry a comic on across pages.** The first page settles a cast and a place;
+  every page after is planned knowing who is in the story and what has already
+  happened, and drawn against the page before it, so the same people keep their
+  faces and clothes from page to page. Move between pages at the bottom of the
+  editor.
 - **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
   effects. Drag to move, type to letter, undo a hundred steps deep.
 - **Open a page someone else drew.** Here the lettering *is* pixels, so SAM 3.1

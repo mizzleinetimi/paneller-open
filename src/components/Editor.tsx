@@ -18,20 +18,43 @@ const button =
 const LANGUAGES = ["Yoruba", "Spanish", "Japanese", "French", "Arabic", "Hindi", "Portuguese"];
 const STYLE_NAMES = ["classic", "manga", "noir", "soft"];
 
-function DrawPage({ busy, onDraw, onClose }: { busy: boolean; onDraw: (idea: string, panels: number, style: string) => void; onClose: () => void }) {
+function DrawPage({
+  busy,
+  continuing,
+  onDraw,
+  onClose,
+}: {
+  busy: boolean;
+  /** The comic already running, if this is a further page. */
+  continuing?: { title: string; cast: { who: string; look: string }[] };
+  onDraw: (idea: string, panels: number, style: string) => void;
+  onClose: () => void;
+}) {
   const [idea, setIdea] = useState("");
   const [panels, setPanels] = useState(4);
   const [style, setStyle] = useState("classic");
   return (
     <div className="absolute left-0 right-0 top-full z-10 border-b border-neutral-200 bg-white p-4 shadow-lg dark:border-neutral-800 dark:bg-neutral-900">
       <div className="mx-auto flex max-w-2xl flex-col gap-3">
-        <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">What happens on this page?</label>
+        <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+          {continuing ? `What happens next in "${continuing.title}"?` : "What happens on this page?"}
+        </label>
+        {continuing && continuing.cast.length > 0 && (
+          <p className="-mt-1 text-xs text-neutral-500">
+            Carrying on with {continuing.cast.map((c) => c.look).join(", ")}, drawn from the page before
+            so they keep their faces.
+          </p>
+        )}
         <textarea
           autoFocus
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
           rows={2}
-          placeholder="a danfo driver in Lagos traffic argues with a conductor, then spots his old teacher through the window"
+          placeholder={
+            continuing
+              ? "the conductor finally gives him his change, and the bus pulls away"
+              : "a danfo driver in Lagos traffic argues with a conductor, then spots his old teacher through the window"
+          }
           className="w-full resize-none rounded-md border border-neutral-300 bg-white p-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -41,21 +64,23 @@ function DrawPage({ busy, onDraw, onClose }: { busy: boolean; onDraw: (idea: str
               {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
-          <label className="text-xs text-neutral-500">
-            Style
-            <select className={`${button} ml-2`} value={style} onChange={(e) => setStyle(e.target.value)}>
-              {STYLE_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
+          {!continuing && (
+            <label className="text-xs text-neutral-500">
+              Style
+              <select className={`${button} ml-2`} value={style} onChange={(e) => setStyle(e.target.value)}>
+                {STYLE_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
           <span className="flex-1" />
           <button className={button} onClick={onClose}>Cancel</button>
           <button className={button} onClick={() => idea.trim() && onDraw(idea.trim(), panels, style)} disabled={busy || !idea.trim()}>
-            {busy ? "Drawing..." : "Draw the page"}
+            {busy ? "Drawing..." : continuing ? "Draw the next page" : "Draw the page"}
           </button>
         </div>
         <p className="text-xs text-neutral-500">
-          Muse Spark plans the panels and the dialogue, Muse Image draws the page, SAM reads it
-          back into parts you can edit. About a minute.
+          Muse Spark plans the panels and the dialogue, Muse Image draws the art with no lettering on
+          it, and the words go on top as objects you can edit. About a minute.
         </p>
       </div>
     </div>
@@ -132,13 +157,58 @@ function readImage(file: File): Promise<{ src: string; width: number; height: nu
   });
 }
 
+/** The pages of the comic, to move between and to add to. */
+function PageStrip({
+  count,
+  current,
+  busy,
+  onGo,
+  onAdd,
+  onRemove,
+}: {
+  count: number;
+  current: number;
+  busy: boolean;
+  onGo: (i: number) => void;
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+      <span className="mr-1 text-xs text-neutral-500">Pages</span>
+      {Array.from({ length: count }, (_, i) => (
+        <button
+          key={i}
+          onClick={() => onGo(i)}
+          className={`h-7 w-7 rounded-md border text-xs font-medium ${
+            i === current
+              ? "border-blue-600 bg-blue-600 text-white"
+              : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          }`}
+        >
+          {i + 1}
+        </button>
+      ))}
+      <button className={`${button} ml-1`} onClick={onAdd} disabled={busy}>+ Page</button>
+      {count > 1 && (
+        <button className={button} onClick={() => onRemove(current)} disabled={busy}>
+          Remove page {current + 1}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Editor() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const { addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage } = useEditor();
+  const {
+    addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage,
+    pageIndex, startStory, appendPage, goToPage, removePage,
+  } = useEditor();
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -184,7 +254,7 @@ export default function Editor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, remove, selection]);
 
-  const page = doc.pages[0];
+  const page = doc.pages[pageIndex];
 
   const call = async <T,>(label: string, url: string, body: unknown): Promise<T | undefined> => {
     setProblem(null);
@@ -236,15 +306,42 @@ export default function Editor() {
   };
 
   const drawNewPage = async (idea: string, panels: number, style: string) => {
-    const out = await call<{ image: string; panels: typeof page.panels; bubbles: typeof page.bubbles }>(
-      "Planning, drawing and reading the page...",
+    const story = doc.story;
+    const carryOn = Boolean(story && doc.pages.some((p) => p.art));
+    const out = await call<{
+      image: string;
+      plan: NonNullable<typeof page.plan>;
+      story?: NonNullable<typeof doc.story>;
+      panels: typeof page.panels;
+      bubbles: typeof page.bubbles;
+    }>(
+      carryOn ? "Planning and drawing the next page..." : "Planning, drawing and lettering the page...",
       "/api/page",
-      { idea, panels, style },
+      carryOn
+        ? {
+            what: idea,
+            panels,
+            story,
+            soFar: doc.pages.map((p) => p.plan).filter(Boolean),
+            // The page before this one, so the cast keeps its faces.
+            reference: doc.pages[doc.pages.length - 1]?.art,
+          }
+        : { idea, panels, style },
     );
     if (!out) return;
     const img = new window.Image();
     img.onload = () => {
-      useEditor.getState().openPage(out.image, img.naturalWidth, img.naturalHeight, out);
+      const made = {
+        art: out.image,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        panels: out.panels,
+        bubbles: out.bubbles,
+        plan: out.plan,
+      };
+      if (carryOn) appendPage(made);
+      else if (out.story) startStory(out.story, made);
+      else openPage(out.image, img.naturalWidth, img.naturalHeight, out);
       setDrawing(false);
     };
     img.src = out.image;
@@ -311,12 +408,29 @@ export default function Editor() {
             busy={Boolean(reading)}
             onDraw={(idea, panels, style) => void drawNewPage(idea, panels, style)}
             onClose={() => setDrawing(false)}
+            continuing={
+              doc.story && doc.pages.some((p) => p.art)
+                ? { title: doc.story.title, cast: doc.story.cast }
+                : undefined
+            }
           />
         )}
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <main className="min-w-0 flex-1">{loaded ? <Canvas stageRef={stageRef} /> : null}</main>
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">{loaded ? <Canvas stageRef={stageRef} /> : null}</div>
+          {doc.pages.length > 0 && (
+            <PageStrip
+              count={doc.pages.length}
+              current={pageIndex}
+              busy={Boolean(reading)}
+              onGo={goToPage}
+              onAdd={() => setDrawing(true)}
+              onRemove={removePage}
+            />
+          )}
+        </main>
         <aside className="flex w-72 shrink-0 flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="p-3 text-xs text-neutral-500">
             Click a panel or a bubble to select it. Drag to move. Cmd+Z undoes.

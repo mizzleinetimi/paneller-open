@@ -13,6 +13,7 @@ import {
   type Page,
   type Panel,
   type Selection,
+  type Story,
   emptyDoc,
   newBubble,
   newId,
@@ -42,10 +43,34 @@ type State = {
   remove: (selection: NonNullable<Selection>) => void;
   setDoc: (doc: Doc) => void;
   openPage: (art: string, width: number, height: number, found: { panels: Panel[]; bubbles: Bubble[] }) => void;
+  startStory: (story: Story, page: NewPage) => void;
+  appendPage: (page: NewPage) => void;
+  goToPage: (index: number) => void;
+  removePage: (index: number) => void;
   setBubbles: (bubbles: Bubble[]) => void;
   setPageArt: (art: string) => void;
   restore: () => Promise<void>;
 };
+
+export type NewPage = {
+  art: string;
+  width: number;
+  height: number;
+  panels: Panel[];
+  bubbles: Bubble[];
+  plan?: Page["plan"];
+};
+
+const asPage = (p: NewPage): Page => ({
+  id: newId("page"),
+  width: p.width,
+  height: p.height,
+  background: "#ffffff",
+  art: p.art,
+  panels: p.panels,
+  bubbles: p.bubbles,
+  plan: p.plan,
+});
 
 const mapPage = (doc: Doc, index: number, f: (page: Page) => Page): Doc => ({
   ...doc,
@@ -158,6 +183,27 @@ export const useEditor = create<State>((set, get) => ({
     get().commit((doc) => mapPage(doc, get().pageIndex, (page) => ({ ...page, bubbles }))),
 
   setPageArt: (art) => get().commit((doc) => mapPage(doc, get().pageIndex, (page) => ({ ...page, art }))),
+
+  startStory: (story, page) => {
+    get().commit(() => ({ title: story.title, story, pages: [asPage(page)] }));
+    set({ pageIndex: 0, selection: null });
+  },
+
+  appendPage: (page) => {
+    get().commit((doc) => ({ ...doc, pages: [...doc.pages, asPage(page)] }));
+    set({ pageIndex: get().doc.pages.length - 1, selection: null });
+  },
+
+  goToPage: (index) => {
+    if (index >= 0 && index < get().doc.pages.length) set({ pageIndex: index, selection: null });
+  },
+
+  removePage: (index) => {
+    const { doc } = get();
+    if (doc.pages.length < 2) return;
+    get().commit((d) => ({ ...d, pages: d.pages.filter((_, i) => i !== index) }));
+    set({ pageIndex: Math.max(0, Math.min(index, get().doc.pages.length - 1)), selection: null });
+  },
 
   restore: async () => {
     const saved = await idbGet<Doc>(SAVE_KEY).catch(() => undefined);

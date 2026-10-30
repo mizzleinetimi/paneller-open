@@ -39,6 +39,12 @@ export type Bubble = {
   clear?: string;
 };
 
+/** What the page was planned as, kept so later pages know what has happened. */
+export type PageMemo = {
+  setting: string;
+  panels: { description: string; speech?: string; speaker?: string; sfx?: string; caption?: string }[];
+};
+
 export type Page = {
   id: string;
   width: number;
@@ -48,9 +54,18 @@ export type Page = {
   art?: string;
   panels: Panel[];
   bubbles: Bubble[];
+  plan?: PageMemo;
 };
 
-export type Doc = { title: string; pages: Page[] };
+/** Everything that carries between pages: the place, and who is in it. */
+export type Story = {
+  title: string;
+  setting: string;
+  cast: { who: string; look: string }[];
+  style: string;
+};
+
+export type Doc = { title: string; story?: Story; pages: Page[] };
 
 export type Selection = { kind: "panel" | "bubble"; id: string } | null;
 
