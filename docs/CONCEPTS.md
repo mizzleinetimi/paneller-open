@@ -70,6 +70,20 @@ better than either alone, still the weakest thing here. A caption box is a
 rectangle of text on a page made of rectangles of text, so this may be a limit
 of describing it in words at all, rather than a phrase not yet guessed.
 
+## Descriptions work as concepts
+
+A concept does not have to be a kind of thing. "man in a green apron" and "man
+in a red shirt" each find the right person on a page where both are drawn, and
+that is what aims a speech balloon's tail: Muse Spark says who is speaking by
+how they look, and SAM finds them. On a four-panel page of two men arguing in a
+tailor's shop, every tail landed on the right head, including the panel where
+the speaker is the smaller and less central of the two - the case that defeats
+picking whoever is biggest.
+
+Describing the same character the same way every time matters, since each
+description costs a call and the answers are cached by description, not by
+panel.
+
 ## Open
 - Whether `comic panel` holds up on full-bleed pages with no gutters, which is
   exactly where a classical splitter gives up.

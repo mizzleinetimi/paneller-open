@@ -17,9 +17,12 @@ Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
   baked in: the text was never pixels, so changing a line, resizing a balloon
   or saying it in Yoruba is just changing it.
 - **Bubbles that size themselves.** A balloon is as big as what it says and no
-  bigger, re-wrapping as you type, and its tail aims at whoever is speaking -
-  SAM finds the people in each panel so the balloon sits clear of their face.
-  Drag the tip to aim it somewhere else.
+  bigger, re-wrapping as you type. Balloon and tail are one outline, and the
+  tail is a curve that hooks the way it is pointing rather than a wedge.
+- **Tails that aim at the right person.** Spark says who speaks by how they
+  look - "man in a green apron" - and SAM finds that person on the page, so the
+  tail points at the speaker rather than at whoever happens to be biggest in
+  the panel. Drag the tip to aim it somewhere else.
 - **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
   effects. Drag to move, type to letter, undo a hundred steps deep.
 - **Open a page someone else drew.** Here the lettering *is* pixels, so SAM 3.1

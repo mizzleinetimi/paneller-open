@@ -13,7 +13,18 @@ import { askJson } from "./meta/text";
 
 export type PagePlan = {
   setting: string;
-  panels: { description: string; speech?: string; sfx?: string; caption?: string }[];
+  panels: {
+    description: string;
+    speech?: string;
+    /**
+     * Who says it, described by how they look rather than named: a segmentation
+     * prompt can find "woman in a yellow headwrap" on the page and cannot find
+     * "Ada". This is what the balloon's tail is aimed at.
+     */
+    speaker?: string;
+    sfx?: string;
+    caption?: string;
+  }[];
 };
 
 const MAX_PANELS = 6;
@@ -27,12 +38,14 @@ export async function planPage(idea: string, panels?: number): Promise<PagePlan>
 
 Give it ${count} panels that tell the idea as a sequence. For each panel say what is drawn - who is in it, what they are doing, where the camera is - in one or two sentences. Give a panel spoken words only where someone speaks, a sound effect only where there is a noise, a caption only where narration is needed. Keep dialogue short: it has to fit in a bubble.
 
+Where a panel has spoken words, also give "speaker": who says them, described by how they look in two to five words, as someone pointing at the page would say it - "woman in a yellow headwrap", "boy in a blue shirt", "man in a grey suit". Never a name, and never a pronoun: this is used to find them in the picture. Describe them the same way every time they appear.
+
 Also give one "setting" line describing the place and the time of day, which every panel shares, so the page does not drift from panel to panel.
 
 Reply with only JSON of this shape, no commentary:
-{"setting": "...", "panels": [{"description": "...", "speech": "...", "sfx": "...", "caption": "..."}]}
+{"setting": "...", "panels": [{"description": "...", "speech": "...", "speaker": "...", "sfx": "...", "caption": "..."}]}
 
-Leave out speech, sfx or caption where the panel has none.`;
+Leave out speech, speaker, sfx or caption where the panel has none.`;
 
   const plan = await askJson<PagePlan>([{ type: "text", text: instruction }], { maxTokens: 6000 });
   if (!plan.panels?.length) throw new Error("Muse Spark returned a page with no panels.");

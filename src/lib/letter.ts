@@ -21,22 +21,20 @@ type Box = { left: number; top: number; right: number; bottom: number };
 const centre = (b: Box): Point => ({ x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 });
 const inside = (p: Point, b: Box) => p.x >= b.left && p.x <= b.right && p.y >= b.top && p.y <= b.bottom;
 
-/** Everyone SAM can find on the page, as boxes. */
-async function findSpeakers(image: string): Promise<Box[]> {
+/** Whatever SAM can find for one description, as boxes. Never throws. */
+async function find(image: string, concept: string): Promise<Box[]> {
   try {
-    const result = await segment({ image, concept: "person", confidence: true });
+    const result = await segment({ image, concept, confidence: true });
     return boxesOf(result).map((b) => ({ left: b.left, top: b.top, right: b.right, bottom: b.bottom }));
   } catch {
     return []; // Lettering still lands, just centred rather than aimed.
   }
 }
 
-/** The biggest person standing inside this panel, if any. */
-function speakerIn(panel: Box, people: Box[]): Box | undefined {
+/** The biggest of these standing inside this panel, if any. */
+function inPanel(panel: Box, people: Box[]): Box | undefined {
   const area = (b: Box) => (b.right - b.left) * (b.bottom - b.top);
-  return people
-    .filter((p) => inside(centre(p), panel))
-    .sort((a, b) => area(b) - area(a))[0];
+  return people.filter((p) => inside(centre(p), panel)).sort((a, b) => area(b) - area(a))[0];
 }
 
 /** A size that suits the panel: big enough to read, never wider than a third. */
@@ -108,17 +106,32 @@ export function letterPanel(panel: Panel, said: PagePlan["panels"][number], spea
   return out;
 }
 
-/** Letters a drawn page from its plan. Panels must be in reading order. */
+/**
+ * Letters a drawn page from its plan. Panels must be in reading order.
+ *
+ * The plan says who speaks and what they look like, so each description is
+ * looked for by name - "woman in a yellow headwrap" - rather than settling for
+ * whoever is biggest in the panel, which aims the tail at the listener as
+ * often as the speaker when two people are talking. One call per distinct
+ * description, not per panel, since a character usually speaks more than once.
+ * Anyone not found falls back to the biggest person there.
+ */
 export async function letterPage(image: string, panels: Panel[], plan: PagePlan): Promise<Bubble[]> {
-  const people = await findSpeakers(image);
+  const described = [...new Set(plan.panels.map((p) => p.speaker?.trim()).filter((s): s is string => Boolean(s)))];
+
+  const [people, ...found] = await Promise.all([
+    find(image, "person"),
+    ...described.map((concept) => find(image, concept)),
+  ]);
+  const byDescription = new Map(described.map((d, i) => [d, found[i]]));
+
   return panels.flatMap((panel, i) => {
     const said = plan.panels[i];
     if (!said) return [];
     const box = bounds(panel.shape);
-    const speaker = speakerIn(
-      { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height },
-      people,
-    );
+    const area: Box = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
+    const named = said.speaker ? byDescription.get(said.speaker.trim()) : undefined;
+    const speaker = (named && inPanel(area, named)) ?? inPanel(area, people);
     return letterPanel(panel, said, speaker);
   });
 }
