@@ -14,11 +14,18 @@ Built for the Meta Global AI Developer Hackathon, Oct–Nov 2026.
 - **Edit a page by hand.** Panels, speech bubbles, caption boxes and sound
   effects. Drag to move, type to letter, undo a hundred steps deep.
 - **Read a page.** SAM 3.1 finds the panels and bubbles on any page — including
-  ones you didn't make — and turns them into editable objects.
-- **Draw a page.** Muse Image draws panel art from a prompt, or redraws a single
-  panel without touching the rest of the page.
-- **Letter it in another language.** Translate a bubble's text to fit the bubble
-  it has to sit in.
+  ones you didn't make — and turns them into editable objects, in reading order.
+- **Read the words.** Muse Spark reads the lettering out of each bubble.
+- **Letter it in another language.** Translated to fit the bubble it has to sit
+  in, because a faithful rendering half as long again breaks the page. Sound
+  effects come back as noise in the target language: "SKRRRT!!!" becomes
+  "GRIIIT!!!" in Yoruba and "キィーッ!!!" in Japanese, not a dictionary entry
+  for a skid.
+- **Redraw one panel.** Muse Image redraws a single panel in place from an
+  instruction, and the rest of the page cannot drift because it is never sent.
+
+Reading a page end to end — four panels, two bubbles, one sound effect, read and
+re-lettered — takes about 40 seconds and costs under two cents.
 
 No account, no server, no database. The document lives in your browser and
 exports to PNG.
