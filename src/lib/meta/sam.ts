@@ -75,9 +75,9 @@ export async function segment(opts: {
   );
 
   const parsed = parseImageStream(sseEvents(res));
-  for await (const _snapshot of parsed) {
-    // Snapshots accumulate; we only want the final one.
-  }
+  // Snapshots accumulate as deltas arrive; we only want what they add up to.
+  const snapshots = parsed[Symbol.asyncIterator]();
+  while (!(await snapshots.next()).done);
   return parsed.finalResult;
 }
 

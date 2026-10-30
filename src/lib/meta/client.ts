@@ -64,7 +64,9 @@ export async function editImage(opts: {
   form.set("n", String(opts.n ?? 1));
   if (opts.size) form.set("size", opts.size);
   for (const img of opts.images) {
-    form.append("image", new Blob([img.bytes], { type: img.type ?? "image/webp" }), img.name);
+    // Copying narrows the buffer type to ArrayBuffer, which Blob requires.
+    const part = new Uint8Array(img.bytes);
+    form.append("image", new Blob([part], { type: img.type ?? "image/webp" }), img.name);
   }
   const res = await fetch(`${BASE}/images/edits`, {
     method: "POST",
