@@ -323,8 +323,11 @@ export default function Editor() {
             panels,
             story,
             soFar: doc.pages.map((p) => p.plan).filter(Boolean),
-            // The page before this one, so the cast keeps its faces.
-            reference: doc.pages[doc.pages.length - 1]?.art,
+            // The page before, for what just happened, and the first page as
+            // an anchor: referencing only the page before lets the comic walk
+            // away from itself a page at a time. See docs/CONTINUITY.md.
+            reference: [doc.pages[0]?.art, doc.pages[doc.pages.length - 1]?.art]
+              .filter((art, i, all): art is string => Boolean(art) && all.indexOf(art) === i),
           }
         : { idea, panels, style },
     );

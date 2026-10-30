@@ -182,10 +182,10 @@ export const STYLES: Record<string, string> = {
 export async function drawPlan(
   plan: PagePlan,
   style: string,
-  reference?: { image: string; cast: string[] },
+  reference?: { images: string[]; cast: string[] },
 ): Promise<string> {
   const prompt = pagePrompt(plan, style);
-  if (!reference) {
+  if (!reference?.images.length) {
     const [b64] = await generateImage({ prompt, size: "1024x1536" });
     return `data:image/webp;base64,${b64}`;
   }
@@ -193,14 +193,20 @@ export async function drawPlan(
   const who = reference.cast.length
     ? ` The same people appear: ${reference.cast.join(", ")}. Keep each of them looking exactly as they do in the reference - same face, same clothes, same colours.`
     : "";
-  const bytes = Buffer.from(reference.image.replace(/^data:image\/\w+;base64,/, ""), "base64");
+  const many = reference.images.length > 1;
+  const images = reference.images.map((image, i) => ({
+    bytes: Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), "base64"),
+    name: `reference-${i + 1}.webp`,
+    type: "image/webp",
+  }));
+
   const [b64] = await editImage({
-    prompt: `The attached image is an earlier page of the same comic, for reference only. Do not modify it, do not include any part of it, and do not copy its panel layout.
+    prompt: `The attached ${many ? "images are earlier pages" : "image is an earlier page"} of the same comic, for reference only. Do not modify ${many ? "them" : "it"}, do not include any part of ${many ? "them" : "it"}, and do not copy ${many ? "their" : "its"} panel layout.
 
 Draw a COMPLETELY NEW comic page, in the same drawing style, with the same characters.${who}
 
 ${prompt}`,
-    images: [{ bytes, name: "reference.webp", type: "image/webp" }],
+    images,
     size: "1024x1536",
   });
   return `data:image/webp;base64,${b64}`;

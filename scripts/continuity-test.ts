@@ -19,7 +19,7 @@ async function main() {
 
   t = Date.now();
   const next = await planNextPage(bible, [plan], "the customer tries the suit on and it fits perfectly", 3);
-  const page2 = await drawPlan(next, STYLES.classic, { image: page1, cast: bible.cast.map((c) => c.look) });
+  const page2 = await drawPlan(next, STYLES.classic, { images: [page1], cast: bible.cast.map((c) => c.look) });
   writeFileSync(".spike/p2.webp", Buffer.from(page2.split(",")[1], "base64"));
   console.log(`page 2 drawn in ${((Date.now() - t) / 1000).toFixed(1)}s`);
   console.log("\n", next.panels.map((p) => `${p.speaker ?? "-"}: ${p.speech ?? ""}`).join("\n "));

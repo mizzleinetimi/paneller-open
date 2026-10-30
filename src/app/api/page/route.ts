@@ -12,7 +12,7 @@ type Body = {
   story?: StoryBible & { style?: string };
   soFar?: PagePlan[];
   /** The page before this one, drawn, so the cast and style carry over. */
-  reference?: string;
+  reference?: string[];
   panels?: number;
   style?: string;
 };
@@ -46,7 +46,9 @@ export async function POST(request: Request) {
     const image = await drawPlan(
       plan,
       style,
-      body.reference ? { image: body.reference, cast: (bible?.cast ?? []).map((c) => c.look) } : undefined,
+      body.reference?.length
+        ? { images: body.reference, cast: (bible?.cast ?? []).map((c) => c.look) }
+        : undefined,
     );
 
     // The art is clean, so the only thing worth finding is the panels; the
