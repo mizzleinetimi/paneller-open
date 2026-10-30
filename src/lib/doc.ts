@@ -29,6 +29,12 @@ export type Bubble = {
   /** Where the tail points, for speech. Absent means no tail. */
   tail?: Point;
   fontSize: number;
+  /**
+   * The page colour around this lettering, sampled when the page was read in.
+   * Re-lettering paints it over the words underneath; a speech bubble covers
+   * its own, but a sound effect sits on bare art and has nothing to hide behind.
+   */
+  clear?: string;
 };
 
 export type Page = {

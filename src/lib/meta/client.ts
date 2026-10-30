@@ -18,19 +18,44 @@ function key(): string {
   return k;
 }
 
-/** POSTs JSON and throws with the body on a non-2xx, so failures say why. */
-export async function metaPost(path: string, body: unknown, opts?: { stream?: boolean }): Promise<Response> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key()}`,
-      "Content-Type": "application/json",
-      ...(opts?.stream ? { Accept: "text/event-stream" } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Meta API ${path} -> ${res.status}: ${(await res.text()).slice(0, 500)}`);
-  return res;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * POSTs JSON, and throws with the body on a non-2xx so failures say why.
+ *
+ * The connection drops now and then - often enough on a Lagos link that a demo
+ * would lose a call to it - so a dropped connection or a 5xx is tried again.
+ * A 4xx is not: a bad prompt or a bad key will fail the same way every time.
+ */
+export async function metaPost(path: string, body: unknown, opts?: { stream?: boolean; tries?: number }): Promise<Response> {
+  const tries = opts?.tries ?? 3;
+  let last = "";
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key()}`,
+          "Content-Type": "application/json",
+          ...(opts?.stream ? { Accept: "text/event-stream" } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // Node's fetch says only "fetch failed"; the reason is on the cause.
+      const cause = e instanceof Error && e.cause instanceof Error ? e.cause.message : String(e);
+      last = `could not be reached: ${cause}`;
+      if (attempt < tries) await sleep(attempt * 800);
+      continue;
+    }
+    if (res.ok) return res;
+    const text = (await res.text()).slice(0, 500);
+    if (res.status < 500) throw new Error(`Meta API ${path} -> ${res.status}: ${text}`);
+    last = `-> ${res.status}: ${text}`;
+    if (attempt < tries) await sleep(attempt * 800);
+  }
+  throw new Error(`Meta API ${path} failed after ${tries} tries: ${last}`);
 }
 
 type ImageResponse = { data: { b64_json: string }[] };

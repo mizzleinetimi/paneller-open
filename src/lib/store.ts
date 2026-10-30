@@ -42,6 +42,8 @@ type State = {
   remove: (selection: NonNullable<Selection>) => void;
   setDoc: (doc: Doc) => void;
   openPage: (art: string, width: number, height: number, found: { panels: Panel[]; bubbles: Bubble[] }) => void;
+  setBubbles: (bubbles: Bubble[]) => void;
+  setPageArt: (art: string) => void;
   restore: () => Promise<void>;
 };
 
@@ -151,6 +153,11 @@ export const useEditor = create<State>((set, get) => ({
     }));
     set({ pageIndex: 0, selection: null });
   },
+
+  setBubbles: (bubbles) =>
+    get().commit((doc) => mapPage(doc, get().pageIndex, (page) => ({ ...page, bubbles }))),
+
+  setPageArt: (art) => get().commit((doc) => mapPage(doc, get().pageIndex, (page) => ({ ...page, art }))),
 
   restore: async () => {
     const saved = await idbGet<Doc>(SAVE_KEY).catch(() => undefined);

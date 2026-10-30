@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
+import { bounds as boundsOf } from "@/lib/doc";
 import { useEditor } from "@/lib/store";
 
 // Konva draws to a canvas and needs a window, so it must not be prerendered.
@@ -13,6 +14,27 @@ const Canvas = dynamic(() => import("./Canvas"), {
 
 const button =
   "rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700";
+
+const LANGUAGES = ["Yoruba", "Spanish", "Japanese", "French", "Arabic", "Hindi", "Portuguese"];
+
+function PanelInspector({ busy, onRedraw }: { busy: boolean; onRedraw: (prompt: string) => void }) {
+  const [prompt, setPrompt] = useState("");
+  return (
+    <div className="flex flex-col gap-2 border-t border-neutral-200 p-3 dark:border-neutral-800">
+      <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">Redraw this panel</label>
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        rows={3}
+        placeholder="make it night, add a second bus..."
+        className="w-full resize-none rounded-md border border-neutral-300 bg-white p-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+      />
+      <button className={button} onClick={() => prompt.trim() && onRedraw(prompt.trim())} disabled={busy || !prompt.trim()}>
+        {busy ? "Drawing..." : "Redraw"}
+      </button>
+    </div>
+  );
+}
 
 function Inspector() {
   const { selection, doc, pageIndex, updateBubble } = useEditor();
@@ -116,10 +138,60 @@ export default function Editor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, remove, selection]);
 
+  const page = doc.pages[0];
+
+  const call = async <T,>(label: string, url: string, body: unknown): Promise<T | undefined> => {
+    setProblem(null);
+    setReading(label);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "That did not work.");
+      setReading(null);
+      return json as T;
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "That did not work.");
+      setReading(null);
+      return undefined;
+    }
+  };
+
+  const readLettering = async () => {
+    const out = await call<{ bubbles: typeof page.bubbles }>("Reading the lettering...", "/api/read", {
+      image: page.art,
+      bubbles: page.bubbles,
+    });
+    if (out) useEditor.getState().setBubbles(out.bubbles);
+  };
+
+  const translate = async (language: string) => {
+    const out = await call<{ bubbles: typeof page.bubbles }>(`Lettering in ${language}...`, "/api/translate", {
+      bubbles: page.bubbles,
+      language,
+    });
+    if (out) useEditor.getState().setBubbles(out.bubbles);
+  };
+
+  const redraw = async (prompt: string) => {
+    if (selection?.kind !== "panel") return;
+    const panel = page.panels.find((p) => p.id === selection.id);
+    if (!panel) return;
+    const out = await call<{ page?: string; art?: string }>("Redrawing the panel...", "/api/redraw", {
+      image: page.art,
+      panel,
+      prompt,
+    });
+    if (out?.page) useEditor.getState().setPageArt(out.page);
+    else if (out?.art) useEditor.getState().updatePanel(panel.id, { art: { src: out.art, ...boundsOf(panel.shape) } });
+  };
+
   const exportPng = () => {
     const stage = stageRef.current;
     if (!stage) return;
-    const page = doc.pages[0];
     const url = stage.toDataURL({ pixelRatio: page.width / stage.width() });
     const a = document.createElement("a");
     a.href = url;
@@ -152,6 +224,20 @@ export default function Editor() {
         <button className={button} onClick={undo} disabled={!past.length}>Undo</button>
         <button className={button} onClick={redo} disabled={!future.length}>Redo</button>
         <button className={button} onClick={() => selection && remove(selection)} disabled={!selection}>Delete</button>
+        <button className={button} onClick={() => void readLettering()} disabled={!page.art || !page.bubbles.length || Boolean(reading)}>
+          Read lettering
+        </button>
+        <select
+          className={button}
+          value=""
+          disabled={!page.bubbles.some((b) => b.text) || Boolean(reading)}
+          onChange={(e) => e.target.value && void translate(e.target.value)}
+        >
+          <option value="">Translate to...</option>
+          {LANGUAGES.map((l) => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+        </select>
         <span className="flex-1" />
         {reading && <span className="text-sm text-neutral-500">{reading}</span>}
         {problem && <span className="text-sm text-red-600 dark:text-red-400">{problem}</span>}
@@ -165,6 +251,7 @@ export default function Editor() {
             Click a panel or a bubble to select it. Drag to move. Cmd+Z undoes.
           </div>
           <Inspector />
+          {selection?.kind === "panel" && <PanelInspector busy={Boolean(reading)} onRedraw={(p) => void redraw(p)} />}
           <div className="mt-auto border-t border-neutral-200 p-3 text-xs text-neutral-500 dark:border-neutral-800">
             Want the whole comic drawn for you, with your characters kept
             consistent across pages?{" "}

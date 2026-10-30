@@ -71,7 +71,7 @@ function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: b
 
 function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }) {
   const { select, updateBubble } = useEditor();
-  const { id, kind, x, y, width, height, text, fontSize, tail } = bubble;
+  const { id, kind, x, y, width, height, text, fontSize, tail, clear } = bubble;
   const pick = () => select({ kind: "bubble", id });
 
   return (
@@ -103,6 +103,7 @@ function BubbleShape({ bubble, selected }: { bubble: Bubble; selected: boolean }
           strokeWidth={selected ? 6 : 4}
         />
       )}
+      {kind === "sfx" && clear && text && <Rect width={width} height={height} fill={clear} />}
       {kind === "caption" && (
         <Rect
           width={width}
