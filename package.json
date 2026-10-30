@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "spike": "tsx --env-file=.env.local scripts/spike.ts"
+    "spike": "tsx --env-file=.env.local scripts/spike.ts",
+    "corpus": "tsx --conditions react-server --env-file=.env.local scripts/corpus.ts",
+    "bench": "tsx --conditions react-server --env-file=.env.local scripts/bench.ts"
   },
   "dependencies": {
     "@meta-sam/graphics": "^0.1.13",

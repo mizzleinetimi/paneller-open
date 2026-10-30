@@ -50,10 +50,27 @@ is actually drawn there.
 
 Expect to need this for any new concept you add.
 
-## Open
+## Caption boxes, which are not solved
 
-- **Caption boxes** are not found by `caption box`. Try `rectangular text box`,
-  `narration box`, `white box with text`.
+`caption box` found nothing on the first test page - because that page has no
+caption boxes. The phrase is fine; the test was. On a page that does have them
+it finds all three. But it does not hold up:
+
+| Page | Captions drawn | `caption box` | `yellow caption` | `rectangular text box` |
+|---|---|---|---|---|
+| 04-captions (yellow) | 3 | 3 at 0.71-0.73 | 3 at 0.87 | 3 at 0.71 |
+| 05-overlap (mixed) | 4 | **0** | 3 at 0.78 | **0** |
+| 06-dense (white) | 1 | **0** | **0** | **0** |
+| 01-grid (white) | 2 | 1 at 0.52 | **0** | 1 at 0.52 |
+
+No phrase finds them dependably, and the two that work best disagree about
+which pages they work on. `detectPage` asks both `caption box` and
+`yellow caption` and merges the answers, which gets 7 of 11 across the corpus -
+better than either alone, still the weakest thing here. A caption box is a
+rectangle of text on a page made of rectangles of text, so this may be a limit
+of describing it in words at all, rather than a phrase not yet guessed.
+
+## Open
 - Whether `comic panel` holds up on full-bleed pages with no gutters, which is
   exactly where a classical splitter gives up.
 - Reading the text inside a bubble. SAM returns the shape, never the words.

@@ -2,8 +2,8 @@
 import { readFileSync } from "node:fs";
 import { boxesOf, segment } from "../src/lib/meta/sam";
 
-const image = `data:image/webp;base64,${readFileSync(".spike/page.webp").toString("base64")}`;
-const concepts = process.argv.slice(2);
+const [file, ...concepts] = process.argv.slice(2);
+const image = `data:image/webp;base64,${readFileSync(file).toString("base64")}`;
 
 async function main() {
 for (const concept of concepts) {

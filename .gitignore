@@ -46,3 +46,6 @@ next-env.d.ts
 
 # dev-only sample pages
 public/dev/
+
+bench/pages/
+bench/out/

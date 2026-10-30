@@ -13,12 +13,19 @@ import { boxesOf, masksOf, segment } from "./meta/sam";
 import { maskToPolygon, snapToBox } from "./trace";
 
 export const CONCEPTS = {
-  panel: "comic panel",
-  speech: "speech bubble",
-  sfx: "comic sound effect lettering",
+  panel: ["comic panel"],
+  speech: ["speech bubble"],
+  sfx: ["comic sound effect lettering"],
+  // No single phrase finds caption boxes dependably: "caption box" finds all
+  // three on one page and none of four on another, where "yellow caption"
+  // finds three. Both are asked and the answers merged. Recall is still poor;
+  // see docs/BENCHMARK.md.
+  caption: ["caption box", "yellow caption"],
 } as const;
 
 export type Detected = { panels: Panel[]; bubbles: Bubble[]; counts: Record<string, number> };
+
+type Box = { left: number; top: number; right: number; bottom: number };
 
 /** Panels in reading order: down the page in bands, left to right inside each. */
 function readingOrder(panels: Panel[], shapes: Map<string, { top: number; left: number; height: number }>): Panel[] {
@@ -35,7 +42,19 @@ function readingOrder(panels: Panel[], shapes: Map<string, { top: number; left: 
   return rows.flatMap((row) => row.sort((a, b) => shapes.get(a.id)!.left - shapes.get(b.id)!.left));
 }
 
-async function shapesFor(image: string, concept: string) {
+type Shape = { polygon: Point[]; box: Box; confidence?: number };
+
+/** Asks every phrase for a thing and merges the answers, keeping the surest. */
+async function shapesFor(image: string, concepts: readonly string[]): Promise<Shape[]> {
+  const found = await Promise.all(concepts.map((c) => shapesForOne(image, c)));
+  const merged: Shape[] = [];
+  for (const shape of found.flat().sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))) {
+    if (!merged.some((kept) => overlap(kept.box, shape.box) > 0.5)) merged.push(shape);
+  }
+  return merged;
+}
+
+async function shapesForOne(image: string, concept: string): Promise<Shape[]> {
   const result = await segment({ image, concept, confidence: true });
   const masks = masksOf(result);
   const boxes = boxesOf(result);
@@ -52,8 +71,6 @@ async function shapesFor(image: string, concept: string) {
         confidence: b.confidence,
       }));
 }
-
-type Box = { left: number; top: number; right: number; bottom: number };
 
 /** Intersection over union: 0 for separate boxes, 1 for identical ones. */
 function overlap(a: Box, b: Box): number {
@@ -105,10 +122,11 @@ export async function detectPage(image: string): Promise<Detected> {
     ? Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), "base64")
     : undefined;
   const size = pageBytes ? await sharp(pageBytes).metadata() : undefined;
-  const [panelShapes, speech, sfx] = await Promise.all([
+  const [panelShapes, speech, sfx, caption] = await Promise.all([
     shapesFor(image, CONCEPTS.panel),
     shapesFor(image, CONCEPTS.speech),
     shapesFor(image, CONCEPTS.sfx),
+    shapesFor(image, CONCEPTS.caption),
   ]);
 
   const panels: Panel[] = panelShapes.map((s) => ({ id: newId("panel"), shape: s.polygon as Point[] }));
@@ -123,11 +141,28 @@ export async function detectPage(image: string): Promise<Detected> {
     ]),
   );
 
-  // "comic sound effect lettering" also matches speech bubbles: on the test page
-  // all three of its hits included both bubbles, boxes identical to the speech
-  // ones. Speech is the surer reading (0.96 against 0.75-0.91), so where the two
-  // land on the same thing, the sound effect goes.
-  const keptSfx = sfx.filter((s) => !speech.some((sp) => overlap(s.box, sp.box) > 0.5));
+  // The concepts overlap: each is asked on its own and knows nothing of the
+  // others, so a sound effect readily claims a speech bubble and a caption
+  // claims a sound effect. Where two land on the same pixels, the surer one
+  // keeps them. Deciding by confidence rather than by a fixed order of
+  // precedence matters: a page here had its real "THUMP!" found as speech at
+  // 0.55 and as a sound effect at 0.91, and a rule that always preferred
+  // speech threw the better answer away.
+  const claims: { kind: BubbleKind; shape: Shape }[] = [
+    ...speech.map((shape) => ({ kind: "speech" as const, shape })),
+    ...sfx.map((shape) => ({ kind: "sfx" as const, shape })),
+    ...caption.map((shape) => ({ kind: "caption" as const, shape })),
+  ].sort((a, b) => (b.shape.confidence ?? 0) - (a.shape.confidence ?? 0));
+
+  const kept: typeof claims = [];
+  for (const claim of claims) {
+    if (!kept.some((k) => overlap(k.shape.box, claim.shape.box) > 0.5)) kept.push(claim);
+  }
+
+  const keptOf = (kind: BubbleKind) => kept.filter((k) => k.kind === kind).map((k) => k.shape);
+  const keptSpeech = keptOf("speech");
+  const keptSfx = keptOf("sfx");
+  const keptCaption = keptOf("caption");
 
   // Only sound effects need a patch; a bubble's own white covers its words.
   const clears =
@@ -140,14 +175,16 @@ export async function detectPage(image: string): Promise<Detected> {
   return {
     panels: readingOrder(panels, boxes),
     bubbles: [
-      ...speech.map((s) => bubbleFrom("speech", s.box)),
+      ...keptSpeech.map((s) => bubbleFrom("speech", s.box)),
       ...keptSfx.map((s, i) => bubbleFrom("sfx", s.box, clears[i])),
+      ...keptCaption.map((c) => bubbleFrom("caption", c.box)),
     ],
     counts: {
       panels: panelShapes.length,
-      speech: speech.length,
+      speech: keptSpeech.length,
       sfx: keptSfx.length,
-      sfxDropped: sfx.length - keptSfx.length,
+      caption: keptCaption.length,
+      dropped: speech.length + sfx.length + caption.length - kept.length,
     },
   };
 }
