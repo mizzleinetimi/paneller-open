@@ -1,6 +1,8 @@
 import type { Panel } from "@/lib/doc";
 import { drawPanel, redrawPanel } from "@/lib/draw";
 
+import { readable } from "@/lib/errors";
+
 export const maxDuration = 180;
 
 /** With a page, redraws the panel in place; without one, draws the panel alone. */
@@ -18,6 +20,6 @@ export async function POST(request: Request) {
     return Response.json({ art: await drawPanel(prompt, width, height) });
   } catch (e) {
     console.error(`/api/redraw failed:`, e);
-    return Response.json({ error: e instanceof Error ? e.message : "Could not draw that panel." }, { status: 500 });
+    return Response.json({ error: readable(e, "panel") }, { status: 500 });
   }
 }

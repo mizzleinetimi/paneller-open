@@ -1,6 +1,7 @@
 import { STYLES, type PagePlan, type StoryBible, drawPlan, planNextPage, planStory } from "@/lib/compose";
 import { detectPage } from "@/lib/detect";
 import { letterPage } from "@/lib/letter";
+import { readable } from "@/lib/errors";
 
 export const maxDuration = 300;
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Say what the page is about." }, { status: 400 });
     }
 
-    const image = await drawPlan(
+    const { image, lostContinuity } = await drawPlan(
       plan,
       style,
       body.reference?.length
@@ -81,9 +82,15 @@ export async function POST(request: Request) {
       panels,
       bubbles,
       counts: { ...found.counts, lettered: bubbles.length },
+      ...(lostContinuity
+        ? {
+            warning:
+              "The models would not draw this page against the pages before it, so it was drawn from its description alone. The characters may not match.",
+          }
+        : {}),
     });
   } catch (e) {
     console.error("/api/page failed:", e);
-    return Response.json({ error: e instanceof Error ? e.message : "Could not draw that page." }, { status: 500 });
+    return Response.json({ error: readable(e, "page") }, { status: 500 });
   }
 }

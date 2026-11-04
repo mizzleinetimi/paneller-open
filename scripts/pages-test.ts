@@ -24,7 +24,7 @@ async function main() {
     console.log(`\npage ${i + 1} layout: ${p.layout ?? "(none given)"}`);
     console.log(`  sizes: ${p.panels.map((x) => x.size ?? "-").join(", ")}`);
     const refs = i === 0 ? undefined : { images: [...new Set([pages[0], pages[pages.length - 1]])], cast: bible.cast.map((c) => c.look) };
-    const image = await drawPlan(p, STYLES.classic, refs);
+    const image = (await drawPlan(p, STYLES.classic, refs)).image;
     writeFileSync(`.spike/pg-${i + 1}.webp`, Buffer.from(image.split(",")[1], "base64"));
     pages.push(image);
     plans.push(p);

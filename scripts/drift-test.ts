@@ -15,7 +15,7 @@ async function chain(label: string, anchorOnFirst: boolean, bible: Awaited<Retur
     const plan = await planNextPage(bible, plans, beat, 3);
     const images = anchorOnFirst && i > 0 ? [pages[0], pages[pages.length - 1]] : [pages[pages.length - 1]];
     const t = Date.now();
-    const image = await drawPlan(plan, STYLES.classic, { images, cast: bible.cast.map((c) => c.look) });
+    const image = (await drawPlan(plan, STYLES.classic, { images, cast: bible.cast.map((c) => c.look) })).image;
     console.log(`  ${label} page ${i + 2}: ${images.length} ref(s), ${((Date.now() - t) / 1000).toFixed(1)}s`);
     writeFileSync(`.spike/drift-${label}-p${i + 2}.webp`, Buffer.from(image.split(",")[1], "base64"));
     pages.push(image);
@@ -27,7 +27,7 @@ async function main() {
   mkdirSync(".spike", { recursive: true });
   const { bible, plan } = await planStory("a keke napep driver in Aba picks up a passenger who turns out to be his landlord", 3);
   console.log(`"${bible.title}" -`, bible.cast.map((c) => c.look).join(" / "));
-  const firstImage = await drawPlan(plan, STYLES.classic);
+  const firstImage = (await drawPlan(plan, STYLES.classic)).image;
   writeFileSync(".spike/drift-p1.webp", Buffer.from(firstImage.split(",")[1], "base64"));
   console.log("  page 1 drawn (shared by both chains)");
   await chain("prev", false, bible, plan, firstImage);

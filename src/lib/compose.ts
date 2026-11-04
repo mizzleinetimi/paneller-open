@@ -8,7 +8,7 @@ import "server-only";
 // ordinary page in the editor - the panels are yours to redraw, the lettering
 // yours to change, and nothing is baked in.
 
-import { editImage, generateImage } from "./meta/client";
+import { ContentFiltered, editImage, generateImage } from "./meta/client";
 import { askJson } from "./meta/text";
 
 /**
@@ -206,16 +206,19 @@ export const STYLES: Record<string, string> = {
  * instead of being described again and hoped for. The prompt has to insist on
  * a *new* page: given an image, the model's first instinct is to alter it.
  */
+export type Drawn = { image: string; /** Set when the page had to be drawn without its references. */ lostContinuity?: boolean };
+
 export async function drawPlan(
   plan: PagePlan,
   style: string,
   reference?: { images: string[]; cast: string[] },
-): Promise<string> {
+): Promise<Drawn> {
   const prompt = pagePrompt(plan, style);
-  if (!reference?.images.length) {
+  const fromText = async (): Promise<string> => {
     const [b64] = await generateImage({ prompt, size: "1024x1536" });
     return `data:image/webp;base64,${b64}`;
-  }
+  };
+  if (!reference?.images.length) return { image: await fromText() };
 
   const who = reference.cast.length
     ? ` The same people appear: ${reference.cast.join(", ")}. Keep each of them looking exactly as they do in the reference - same face, same clothes, same colours.`
@@ -227,16 +230,24 @@ export async function drawPlan(
     type: "image/webp",
   }));
 
-  const [b64] = await editImage({
-    prompt: `The attached ${many ? "images are earlier pages" : "image is an earlier page"} of the same comic, for reference only. Do not modify ${many ? "them" : "it"}, do not include any part of ${many ? "them" : "it"}, and do not copy ${many ? "their" : "its"} panel layout.
+  try {
+    const [b64] = await editImage({
+      prompt: `The attached ${many ? "images are earlier pages" : "image is an earlier page"} of the same comic, for reference only. Do not modify ${many ? "them" : "it"}, do not include any part of ${many ? "them" : "it"}, and do not copy ${many ? "their" : "its"} panel layout.
 
 Draw a COMPLETELY NEW comic page, in the same drawing style, with the same characters.${who}
 
 ${prompt}`,
-    images,
-    size: "1024x1536",
-  });
-  return `data:image/webp;base64,${b64}`;
+      images,
+      size: "1024x1536",
+    });
+    return { image: `data:image/webp;base64,${b64}` };
+  } catch (e) {
+    if (!(e instanceof ContentFiltered)) throw e;
+    // Drawing against a picture is refused more readily than drawing from
+    // text. Rather than lose the page, draw it from its description alone and
+    // tell the caller the cast may not have carried.
+    return { image: await fromText(), lostContinuity: true };
+  }
 }
 
 /** Idea in, drawn page out. */
@@ -246,5 +257,6 @@ export async function drawPage(
 ): Promise<{ image: string; plan: PagePlan }> {
   const plan = await planPage(idea, opts.panels);
   const style = STYLES[opts.style ?? "classic"] ?? STYLES.classic;
-  return { image: await drawPlan(plan, STYLES[opts.style ?? "classic"] ?? style), plan };
+  const { image } = await drawPlan(plan, style);
+  return { image, plan };
 }

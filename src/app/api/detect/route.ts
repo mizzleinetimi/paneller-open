@@ -1,4 +1,5 @@
 import { detectPage } from "@/lib/detect";
+import { readable } from "@/lib/errors";
 
 export const maxDuration = 120;
 
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
     }
     return Response.json(await detectPage(image));
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Could not read that page.";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("/api/detect failed:", e);
+    return Response.json({ error: readable(e, "page") }, { status: 500 });
   }
 }

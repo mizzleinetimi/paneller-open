@@ -1,6 +1,8 @@
 import type { Bubble } from "@/lib/doc";
 import { readBubbles } from "@/lib/ocr";
 
+import { readable } from "@/lib/errors";
+
 export const maxDuration = 120;
 
 /** Reads the words out of bubbles SAM already found. */
@@ -11,6 +13,6 @@ export async function POST(request: Request) {
     return Response.json({ bubbles: await readBubbles(image, bubbles) });
   } catch (e) {
     console.error(`/api/read failed:`, e);
-    return Response.json({ error: e instanceof Error ? e.message : "Could not read the lettering." }, { status: 500 });
+    return Response.json({ error: readable(e, "lettering") }, { status: 500 });
   }
 }

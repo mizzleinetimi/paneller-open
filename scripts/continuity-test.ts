@@ -13,13 +13,13 @@ async function main() {
   for (const c of bible.cast) console.log(`  ${c.who}: ${c.look}`);
 
   t = Date.now();
-  const page1 = await drawPlan(plan, STYLES.classic);
+  const page1 = (await drawPlan(plan, STYLES.classic)).image;
   writeFileSync(".spike/p1.webp", Buffer.from(page1.split(",")[1], "base64"));
   console.log(`page 1 drawn in ${((Date.now() - t) / 1000).toFixed(1)}s`);
 
   t = Date.now();
   const next = await planNextPage(bible, [plan], "the customer tries the suit on and it fits perfectly", 3);
-  const page2 = await drawPlan(next, STYLES.classic, { images: [page1], cast: bible.cast.map((c) => c.look) });
+  const page2 = (await drawPlan(next, STYLES.classic, { images: [page1], cast: bible.cast.map((c) => c.look) })).image;
   writeFileSync(".spike/p2.webp", Buffer.from(page2.split(",")[1], "base64"));
   console.log(`page 2 drawn in ${((Date.now() - t) / 1000).toFixed(1)}s`);
   console.log("\n", next.panels.map((p) => `${p.speaker ?? "-"}: ${p.speech ?? ""}`).join("\n "));

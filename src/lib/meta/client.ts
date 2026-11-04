@@ -18,6 +18,22 @@ function key(): string {
   return k;
 }
 
+/**
+ * The image models refuse things, and a refusal is not a fault to be retried:
+ * the same prompt will be refused again. Drawing against a reference picture
+ * is refused more readily than drawing from text alone, so callers that can
+ * drop the reference and try again need to be able to tell this apart.
+ */
+export class ContentFiltered extends Error {
+  readonly filtered = true;
+  constructor(where: string) {
+    super(`${where} was refused by the content filter`);
+    this.name = "ContentFiltered";
+  }
+}
+
+const isFiltered = (body: string) => /content_policy_violation|content management policy|safety/i.test(body);
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -51,6 +67,7 @@ export async function metaPost(path: string, body: unknown, opts?: { stream?: bo
     }
     if (res.ok) return res;
     const text = (await res.text()).slice(0, 500);
+    if (isFiltered(text)) throw new ContentFiltered(`Meta API ${path}`);
     if (res.status < 500) throw new Error(`Meta API ${path} -> ${res.status}: ${text}`);
     last = `-> ${res.status}: ${text}`;
     if (attempt < tries) await sleep(attempt * 800);
@@ -98,6 +115,10 @@ export async function editImage(opts: {
     headers: { Authorization: `Bearer ${key()}` },
     body: form,
   });
-  if (!res.ok) throw new Error(`Meta API /images/edits -> ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  if (!res.ok) {
+    const text = (await res.text()).slice(0, 500);
+    if (isFiltered(text)) throw new ContentFiltered("Meta API /images/edits");
+    throw new Error(`Meta API /images/edits -> ${res.status}: ${text}`);
+  }
   return ((await res.json()) as ImageResponse).data.map((d) => d.b64_json);
 }

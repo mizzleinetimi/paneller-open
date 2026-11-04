@@ -353,6 +353,7 @@ export default function Editor() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<{ note: string; stages?: Stage[]; since: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [shelf, setShelf] = useState(false);
 
@@ -387,6 +388,7 @@ export default function Editor() {
 
   const call = async <T,>(note: string, url: string, body: unknown, stages?: Stage[]): Promise<T | undefined> => {
     setProblem(null);
+    setNotice(null);
     setBusy({ note, stages, since: Date.now() });
     try {
       const res = await fetch(url, {
@@ -396,6 +398,7 @@ export default function Editor() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "That did not work.");
+      if (typeof json.warning === "string") setNotice(json.warning);
       return json as T;
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "That did not work.");
@@ -573,7 +576,15 @@ export default function Editor() {
         )}
 
         <span className="flex-1" />
-        {problem && <span className="max-w-xs truncate text-[13px] text-[var(--warn)]" title={problem}>{problem}</span>}
+        {problem && (
+          <span className="max-w-sm text-[12px] font-bold leading-tight text-[var(--danger)]">{problem}</span>
+        )}
+        {!problem && notice && (
+          <span className="max-w-sm text-[12px] leading-tight text-ink-soft">
+            {notice}{" "}
+            <button className="underline underline-offset-2" onClick={() => setNotice(null)}>Dismiss</button>
+          </span>
+        )}
         {started && <button className="btn btn-hollow" onClick={exportPng} disabled={working}>Export PNG</button>}
 
         {shelf && (

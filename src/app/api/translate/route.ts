@@ -1,6 +1,8 @@
 import type { Bubble } from "@/lib/doc";
 import { translateBubbles } from "@/lib/translate";
 
+import { readable } from "@/lib/errors";
+
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
@@ -10,6 +12,6 @@ export async function POST(request: Request) {
     return Response.json({ bubbles: await translateBubbles(bubbles, language) });
   } catch (e) {
     console.error(`/api/translate failed:`, e);
-    return Response.json({ error: e instanceof Error ? e.message : "Could not translate." }, { status: 500 });
+    return Response.json({ error: readable(e, "translation") }, { status: 500 });
   }
 }
