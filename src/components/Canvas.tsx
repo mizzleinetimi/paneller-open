@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Image as KImage, Layer, Line, Rect, Shape, Stage, Text } from "react-konva";
 import type Konva from "konva";
 import { FAMILY, balloonPath, measure } from "@/lib/bubble";
@@ -26,7 +26,17 @@ function useImage(src: string | undefined) {
   return loaded && loaded.src === src ? loaded.img : undefined;
 }
 
-function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: boolean; hasPageArt: boolean }) {
+function PanelShape({
+  panel,
+  selected,
+  hasPageArt,
+  onZoom,
+}: {
+  panel: Panel;
+  selected: boolean;
+  hasPageArt: boolean;
+  onZoom: (to: { x: number; y: number; width: number; height: number }) => void;
+}) {
   const { select, updatePanel } = useEditor();
   const art = useImage(panel.art?.src);
   const box = useMemo(() => bounds(panel.shape), [panel.shape]);
@@ -47,6 +57,8 @@ function PanelShape({ panel, selected, hasPageArt }: { panel: Panel; selected: b
       onDragEnd={onDragEnd}
       onMouseDown={() => select({ kind: "panel", id: panel.id })}
       onTap={() => select({ kind: "panel", id: panel.id })}
+      onDblClick={() => onZoom(box)}
+      onDblTap={() => onZoom(box)}
     >
       <Group
         clipFunc={(ctx) => {
@@ -192,49 +204,128 @@ function BubbleShape({
   );
 }
 
+const MIN_ZOOM = 0.08;
+const MAX_ZOOM = 6;
+const clamp = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+
 export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.Stage | null> }) {
   const { selection, select } = useEditor();
   const page = useEditor((s) => s.doc.pages[s.pageIndex]);
   const pageArt = useImage(page.art);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.4);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  // No view means "show the whole page": it is worked out while rendering from
+  // the room available, so there is no effect racing the first paint.
+  const [view, setView] = useState<{ zoom: number; x: number; y: number } | null>(null);
+  const [shown, setShown] = useState(page.id);
+  if (shown !== page.id) {
+    setShown(page.id);
+    setView(null);
+  }
 
   useEffect(() => {
-    const fit = () => {
-      const el = wrapRef.current;
-      if (el) setScale(Math.min((el.clientWidth - 48) / page.width, (el.clientHeight - 48) / page.height));
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [page.width, page.height]);
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => setSize({ width: el.clientWidth, height: el.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  /** The view that puts a rectangle of the page in the middle. */
+  const framing = useCallback(
+    (box: { x: number; y: number; width: number; height: number }, margin: number) => {
+      const zoom = clamp(Math.min((size.width - margin) / box.width, (size.height - margin) / box.height));
+      return {
+        zoom,
+        x: size.width / 2 - (box.x + box.width / 2) * zoom,
+        y: size.height / 2 - (box.y + box.height / 2) * zoom,
+      };
+    },
+    [size.width, size.height],
+  );
+
+  const whole = useMemo(
+    () =>
+      size.width && size.height
+        ? framing({ x: 0, y: 0, width: page.width, height: page.height }, 48)
+        : { zoom: 0.4, x: 0, y: 0 },
+    [framing, size.width, size.height, page.width, page.height],
+  );
+
+  const current = view ?? whole;
+  const frame = (box: { x: number; y: number; width: number; height: number }, margin = 48) => {
+    if (size.width && size.height) setView(framing(box, margin));
+  };
+  const fit = () => setView(null);
+
+  /** Zooms about a point, so what is under the cursor stays under it. */
+  const zoomAt = (next: number, at: { x: number; y: number }) => {
+    setView((v) => {
+      const from = v ?? whole;
+      const zoom = clamp(next);
+      return {
+        zoom,
+        x: at.x - ((at.x - from.x) / from.zoom) * zoom,
+        y: at.y - ((at.y - from.y) / from.zoom) * zoom,
+      };
+    });
+  };
+
+  const onWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = e.target.getStage();
+    const pointer = stage?.getPointerPosition();
+    // A trackpad pinch arrives as a wheel with ctrl held; plain wheel pans, as
+    // it does in every other canvas anyone has used.
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      if (pointer) zoomAt(current.zoom * Math.pow(0.998, e.evt.deltaY), pointer);
+    } else {
+      setView((v) => {
+        const from = v ?? whole;
+        return { ...from, x: from.x - e.evt.deltaX, y: from.y - e.evt.deltaY };
+      });
+    }
+  };
+
+  const step = (by: number) => zoomAt(current.zoom * by, { x: size.width / 2, y: size.height / 2 });
 
   return (
-    <div
-      ref={wrapRef}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) select(null);
-      }}
-      className="flex h-full w-full items-center justify-center overflow-hidden bg-[var(--paper-2)]"
-    >
+    <div ref={wrapRef} className="relative h-full w-full overflow-hidden bg-[var(--paper-2)]">
       <Stage
         ref={stageRef}
-        width={page.width * scale}
-        height={page.height * scale}
-        scale={{ x: scale, y: scale }}
+        width={size.width}
+        height={size.height}
+        scale={{ x: current.zoom, y: current.zoom }}
+        x={current.x}
+        y={current.y}
+        draggable
+        onWheel={onWheel}
+        onDragEnd={(e) => {
+          if (e.target === e.target.getStage()) setView((v) => ({ ...(v ?? whole), x: e.target.x(), y: e.target.y() }));
+        }}
         onMouseDown={(e) => {
           if (e.target === e.target.getStage()) select(null);
         }}
-        className="shadow-[0_1px_3px_rgba(0,0,0,0.12),0_12px_32px_rgba(0,0,0,0.10)]"
       >
         <Layer>
-          <Rect width={page.width} height={page.height} fill={page.background} />
+          <Rect
+            width={page.width}
+            height={page.height}
+            fill={page.background}
+            shadowColor="#000"
+            shadowBlur={24 / current.zoom}
+            shadowOpacity={0.18}
+            shadowOffset={{ x: 0, y: 6 / current.zoom }}
+          />
           {pageArt && <KImage image={pageArt} width={page.width} height={page.height} listening={false} />}
           {page.panels.map((panel) => (
             <PanelShape
               key={panel.id}
               panel={panel}
               hasPageArt={Boolean(page.art)}
+              onZoom={(box) => frame(box, 24)}
               selected={selection?.kind === "panel" && selection.id === panel.id}
             />
           ))}
@@ -242,13 +333,29 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
             <BubbleShape
               key={bubble.id}
               bubble={bubble}
-              scale={scale}
+              scale={current.zoom}
               page={page}
               selected={selection?.kind === "bubble" && selection.id === bubble.id}
             />
           ))}
         </Layer>
       </Stage>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-lg border-2 border-[var(--line)] bg-[var(--paper-raised)] px-1.5 py-1 shadow-[2px_2px_0_var(--line)]">
+          <button className="px-2 text-[15px] leading-none" onClick={() => step(1 / 1.25)} title="Zoom out">-</button>
+          <span className="w-12 text-center text-[11px] tabular-nums text-ink-soft">
+            {Math.round(current.zoom * 100)}%
+          </span>
+          <button className="px-2 text-[15px] leading-none" onClick={() => step(1.25)} title="Zoom in">+</button>
+          <span className="mx-0.5 h-4 w-px bg-[var(--rule)]" />
+          <button className="px-2 text-[11px] font-bold" onClick={fit}>Fit</button>
+        </div>
+      </div>
+
+      <p className="pointer-events-none absolute bottom-3 right-3 hidden text-[11px] text-ink-faint lg:block">
+        Pinch or ctrl-scroll to zoom · drag to pan · double-click a panel
+      </p>
     </div>
   );
 }

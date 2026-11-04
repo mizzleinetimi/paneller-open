@@ -506,7 +506,21 @@ export default function Editor() {
   const exportPng = () => {
     const stage = stageRef.current;
     if (!stage) return;
-    const url = stage.toDataURL({ pixelRatio: page.width / stage.width() });
+    // The stage shows whatever the reader has zoomed to, which is not what
+    // they want in a file: the page is squared up at its own size, exported,
+    // and the view put back. Selection handles would be drawn too, so the
+    // selection goes first.
+    useEditor.getState().select(null);
+    const was = { x: stage.x(), y: stage.y(), zoom: stage.scaleX(), width: stage.width(), height: stage.height() };
+    stage.position({ x: 0, y: 0 });
+    stage.scale({ x: 1, y: 1 });
+    stage.size({ width: page.width, height: page.height });
+    stage.draw();
+    const url = stage.toDataURL({ pixelRatio: 1 });
+    stage.position({ x: was.x, y: was.y });
+    stage.scale({ x: was.zoom, y: was.zoom });
+    stage.size({ width: was.width, height: was.height });
+    stage.draw();
     const a = document.createElement("a");
     a.href = url;
     a.download = `${(doc.story?.title ?? doc.title).replace(/\W+/g, "-").toLowerCase()}-${pageIndex + 1}.png`;
