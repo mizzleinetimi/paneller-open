@@ -4,14 +4,15 @@
 // `commit`, which pushes the previous document onto the past stack. Dragging
 // calls `live` instead, so a drag is one undo step rather than sixty.
 
-import { get as idbGet, set as idbSet } from "idb-keyval";
 import { create } from "zustand";
+import { adoptLegacy, deleteComic as dropComic, readComic, readIndex, thumbnail, writeComic } from "./library";
 import {
   type Bubble,
   type BubbleKind,
   type Doc,
   type Page,
   type Panel,
+  type ComicSummary,
   type Selection,
   type Story,
   emptyDoc,
@@ -19,7 +20,6 @@ import {
   newId,
 } from "./doc";
 
-const SAVE_KEY = "paneller-open.doc";
 const LIMIT = 100;
 
 type State = {
@@ -29,6 +29,8 @@ type State = {
   past: Doc[];
   future: Doc[];
   loaded: boolean;
+  /** Every comic kept in this browser, newest first. */
+  library: ComicSummary[];
 
   page: () => Page;
   commit: (next: (doc: Doc) => Doc) => void;
@@ -42,6 +44,10 @@ type State = {
   addBubble: (kind: BubbleKind) => void;
   remove: (selection: NonNullable<Selection>) => void;
   setDoc: (doc: Doc) => void;
+  newComic: () => void;
+  openComic: (id: string) => Promise<void>;
+  forgetComic: (id: string) => Promise<void>;
+  rename: (title: string) => void;
   openPage: (art: string, width: number, height: number, found: { panels: Panel[]; bubbles: Bubble[] }) => void;
   startStory: (story: Story, page: NewPage) => void;
   appendPage: (page: NewPage) => void;
@@ -72,6 +78,14 @@ const asPage = (p: NewPage): Page => ({
   plan: p.plan,
 });
 
+type Setter = (partial: Partial<State>) => void;
+
+/** Writes a comic and refreshes the shelf; the first page becomes its cover. */
+async function save(doc: Doc, set: Setter) {
+  const cover = await thumbnail(doc.pages[0]?.art);
+  set({ library: await writeComic(doc, cover) });
+}
+
 const mapPage = (doc: Doc, index: number, f: (page: Page) => Page): Doc => ({
   ...doc,
   pages: doc.pages.map((p, i) => (i === index ? f(p) : p)),
@@ -84,6 +98,7 @@ export const useEditor = create<State>((set, get) => ({
   past: [],
   future: [],
   loaded: false,
+  library: [],
 
   page: () => get().doc.pages[get().pageIndex],
 
@@ -91,7 +106,7 @@ export const useEditor = create<State>((set, get) => ({
     set((s) => {
       const doc = next(s.doc);
       if (doc === s.doc) return s;
-      void idbSet(SAVE_KEY, doc);
+      void save(doc, set);
       return { doc, past: [...s.past, s.doc].slice(-LIMIT), future: [] };
     }),
 
@@ -105,7 +120,7 @@ export const useEditor = create<State>((set, get) => ({
     set((s) => {
       const previous = s.past.at(-1);
       if (!previous) return s;
-      void idbSet(SAVE_KEY, previous);
+      void save(previous, set);
       return { doc: previous, past: s.past.slice(0, -1), future: [s.doc, ...s.future], selection: null };
     }),
 
@@ -113,7 +128,7 @@ export const useEditor = create<State>((set, get) => ({
     set((s) => {
       const [next, ...rest] = s.future;
       if (!next) return s;
-      void idbSet(SAVE_KEY, next);
+      void save(next, set);
       return { doc: next, past: [...s.past, s.doc], future: rest, selection: null };
     }),
 
@@ -161,6 +176,25 @@ export const useEditor = create<State>((set, get) => ({
 
   setDoc: (doc) => get().commit(() => doc),
 
+  newComic: () => {
+    const doc = emptyDoc();
+    set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
+  },
+
+  openComic: async (id) => {
+    const doc = await readComic(id);
+    if (doc) set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
+  },
+
+  forgetComic: async (id) => {
+    const library = await dropComic(id);
+    set({ library });
+    if (get().doc.id === id) set({ doc: emptyDoc(), pageIndex: 0, selection: null, past: [], future: [] });
+  },
+
+  rename: (title) =>
+    get().commit((doc) => ({ ...doc, title, ...(doc.story ? { story: { ...doc.story, title } } : {}) })),
+
   openPage: (art, width, height, found) => {
     get().commit((doc) => ({
       ...doc,
@@ -185,8 +219,10 @@ export const useEditor = create<State>((set, get) => ({
   setPageArt: (art) => get().commit((doc) => mapPage(doc, get().pageIndex, (page) => ({ ...page, art }))),
 
   startStory: (story, page) => {
-    get().commit(() => ({ title: story.title, story, pages: [asPage(page)] }));
-    set({ pageIndex: 0, selection: null });
+    // A new comic is a new comic: it never writes over the one on screen.
+    const doc: Doc = { id: newId("comic"), title: story.title, story, pages: [asPage(page)] };
+    void save(doc, set);
+    set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
   },
 
   appendPage: (page) => {
@@ -206,7 +242,9 @@ export const useEditor = create<State>((set, get) => ({
   },
 
   restore: async () => {
-    const saved = await idbGet<Doc>(SAVE_KEY).catch(() => undefined);
-    set(saved?.pages?.length ? { doc: saved, loaded: true } : { loaded: true });
+    await adoptLegacy();
+    const library = await readIndex();
+    const latest = library[0] ? await readComic(library[0].id) : undefined;
+    set(latest?.pages?.length ? { doc: latest, library, loaded: true } : { library, loaded: true });
   },
 }));

@@ -213,6 +213,73 @@ function DrawDialog({
   );
 }
 
+/** The shelf: every comic kept in this browser. */
+function Library({
+  library,
+  currentId,
+  onOpen,
+  onNew,
+  onForget,
+  onClose,
+}: {
+  library: { id: string; title: string; pages: number; updatedAt: number; cover?: string }[];
+  currentId: string;
+  onOpen: (id: string) => void;
+  onNew: () => void;
+  onForget: (id: string) => void;
+  onClose: () => void;
+}) {
+  // Rendering "5 min ago" would mean reading the clock while rendering, which
+  // is not a pure thing to do; the moment it was last touched says as much.
+  const when = (t: number) =>
+    new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  return (
+    <div className="absolute inset-x-0 top-full z-20 max-h-[70vh] overflow-y-auto border-b-2 border-[var(--line)] bg-[var(--paper-raised)] px-4 py-4 shadow-[0_6px_0_rgba(0,0,0,0.06)]">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="label">Comics in this browser</span>
+          <span className="flex-1" />
+          <button className="btn btn-key" onClick={onNew}>Start a new comic</button>
+          <button className="btn btn-hollow" onClick={onClose}>Close</button>
+        </div>
+        {library.length === 0 ? (
+          <p className="text-[13px] text-ink-soft">Nothing saved yet. Draw a page and it is kept here.</p>
+        ) : (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+            {library.map((c) => (
+              <li key={c.id} className={`card overflow-hidden ${c.id === currentId ? "outline outline-2 outline-[var(--accent)]" : ""}`}>
+                <button onClick={() => onOpen(c.id)} className="block w-full text-left">
+                  <span className="block h-[180px] overflow-hidden border-b-2 border-[var(--line)] bg-[var(--paper-2)]">
+                    {c.cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={c.cover} alt="" className="h-full w-full object-cover object-top" />
+                    ) : (
+                      <span className="grid h-full place-items-center text-[11px] text-ink-faint">no pages yet</span>
+                    )}
+                  </span>
+                  <span className="block px-2.5 pb-1 pt-2 text-[13px] font-bold leading-tight">{c.title}</span>
+                  <span className="block px-2.5 pb-2 text-[11px] text-ink-faint">
+                    {c.pages} page{c.pages === 1 ? "" : "s"} · {when(c.updatedAt)}
+                  </span>
+                </button>
+                <div className="border-t-2 border-[var(--line)] px-2.5 py-1.5">
+                  <button
+                    className="text-[11px] text-ink-faint hover:text-[var(--danger)]"
+                    onClick={() => onForget(c.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Nothing made yet: the two ways in, and what each one is for. */
 function Start({ onDraw, onOpen }: { onDraw: () => void; onOpen: () => void }) {
   return (
@@ -256,10 +323,12 @@ export default function Editor() {
   const [busy, setBusy] = useState<{ note: string; stages?: Stage[]; since: number } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [shelf, setShelf] = useState(false);
 
   const {
     addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage,
     pageIndex, startStory, appendPage, goToPage, removePage,
+    library, newComic, openComic, forgetComic,
   } = useEditor();
 
   const page = doc.pages[pageIndex];
@@ -418,6 +487,16 @@ export default function Editor() {
         <Wordmark />
         <Divider />
 
+        <button className="btn btn-hollow" onClick={() => { setShelf((v) => !v); setDrawing(false); }} disabled={working}>
+          Comics{library.length ? ` (${library.length})` : ""}
+        </button>
+        {started && (
+          <span className="hidden max-w-[16ch] truncate text-[13px] font-bold md:inline" title={doc.story?.title ?? doc.title}>
+            {doc.story?.title ?? doc.title}
+          </span>
+        )}
+        <Divider />
+
         <input
           ref={fileRef}
           type="file"
@@ -426,7 +505,7 @@ export default function Editor() {
           onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ""; }}
         />
         <Group label="Make">
-          <button className="btn btn-key" onClick={() => setDrawing((d) => !d)} disabled={working}>
+          <button className="btn btn-key" onClick={() => { setDrawing((d) => !d); setShelf(false); }} disabled={working}>
             {carryOn ? "Next page" : "Draw a page"}
           </button>
           <button className="btn btn-hollow" onClick={() => fileRef.current?.click()} disabled={working}>Open a page</button>
@@ -465,6 +544,17 @@ export default function Editor() {
         <span className="flex-1" />
         {problem && <span className="max-w-xs truncate text-[13px] text-[var(--warn)]" title={problem}>{problem}</span>}
         {started && <button className="btn btn-hollow" onClick={exportPng} disabled={working}>Export PNG</button>}
+
+        {shelf && (
+          <Library
+            library={library}
+            currentId={doc.id}
+            onOpen={(id) => { void openComic(id); setShelf(false); }}
+            onNew={() => { newComic(); setShelf(false); setDrawing(true); }}
+            onForget={(id) => void forgetComic(id)}
+            onClose={() => setShelf(false)}
+          />
+        )}
 
         {drawing && (
           <DrawDialog

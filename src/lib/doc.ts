@@ -73,7 +73,17 @@ export type Story = {
   style: string;
 };
 
-export type Doc = { title: string; story?: Story; pages: Page[] };
+export type Doc = { id: string; title: string; story?: Story; pages: Page[] };
+
+/** What the library lists without loading a whole comic. */
+export type ComicSummary = {
+  id: string;
+  title: string;
+  pages: number;
+  updatedAt: number;
+  /** A small picture of the first page, for the list. */
+  cover?: string;
+};
 
 export type Selection = { kind: "panel" | "bubble"; id: string } | null;
 
@@ -116,7 +126,7 @@ export function emptyPage(width = 1280, height = 1920): Page {
   };
 }
 
-export const emptyDoc = (): Doc => ({ title: "Untitled comic", pages: [emptyPage()] });
+export const emptyDoc = (): Doc => ({ id: newId("comic"), title: "Untitled comic", pages: [emptyPage()] });
 
 export function newBubble(kind: BubbleKind, x: number, y: number): Bubble {
   return {
