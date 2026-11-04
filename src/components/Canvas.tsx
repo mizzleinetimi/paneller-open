@@ -463,6 +463,12 @@ export default function Canvas({
             shadowOffset={{ x: 0, y: 6 / current.zoom }}
           />
           {pageArt && <KImage image={pageArt} width={page.width} height={page.height} listening={false} />}
+          {/* Before the panels are found there is nothing to crop, so the page
+              is shown whole. Once they exist they cover it exactly, and after
+              that they may be moved, so it must not stay underneath. */}
+          {!pageArt && sourceArt && page.panels.length === 0 && (
+            <KImage image={sourceArt} width={page.width} height={page.height} listening={false} />
+          )}
           {page.panels.map((panel, i) => (
             <PanelShape
               key={panel.id}

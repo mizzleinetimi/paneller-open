@@ -57,9 +57,12 @@ type State = {
   forgetComic: (id: string) => Promise<void>;
   rename: (title: string) => void;
   openPage: (art: string, width: number, height: number, found: { panels: Panel[]; bubbles: Bubble[] }) => void;
-  startStory: (story: Story, page: NewPage) => void;
+  startStory: (story: Story, page: NewPage) => string;
+  appendPageAt: (page: NewPage) => string;
   appendPage: (page: NewPage) => void;
   goToPage: (index: number) => void;
+  /** Puts the panels and lettering onto a page already on screen. */
+  furnish: (pageId: string, panels: Panel[], bubbles: Bubble[]) => void;
   removePage: (index: number) => void;
   setBubbles: (bubbles: Bubble[]) => void;
   setPageArt: (art: string) => void;
@@ -320,14 +323,30 @@ export const useEditor = create<State>((set, get) => ({
 
   startStory: (story, page) => {
     // A new comic is a new comic: it never writes over the one on screen.
-    const doc: Doc = { id: newId("comic"), title: story.title, story, pages: [asPage(page)] };
+    const made = asPage(page);
+    const doc: Doc = { id: newId("comic"), title: story.title, story, pages: [made] };
     void save(doc, set);
     set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
+    return made.id;
+  },
+
+  appendPageAt: (page) => {
+    const made = asPage(page);
+    get().commit((doc) => ({ ...doc, pages: [...doc.pages, made] }));
+    set({ pageIndex: get().doc.pages.length - 1, selection: null });
+    return made.id;
   },
 
   appendPage: (page) => {
     get().commit((doc) => ({ ...doc, pages: [...doc.pages, asPage(page)] }));
     set({ pageIndex: get().doc.pages.length - 1, selection: null });
+  },
+
+  furnish: (pageId, panels, bubbles) => {
+    get().commit((doc) => ({
+      ...doc,
+      pages: doc.pages.map((p) => (p.id === pageId ? { ...p, panels, bubbles } : p)),
+    }));
   },
 
   goToPage: (index) => {

@@ -27,8 +27,6 @@ export const MAKE_STAGES: Stage[] = [
 export const CONTINUE_STAGES: Stage[] = [
   { label: "Planning the next page from the story so far", by: "Muse Spark", seconds: 18 },
   { label: "Drawing it against the cast sheet and the page before", by: "Muse Image", seconds: 44 },
-  { label: "Finding the panels", by: "SAM 3.1", seconds: 20 },
-  { label: "Laying the lettering over it", by: "SAM 3.1", seconds: 8 },
 ];
 
 /** With characters brought along, there is nothing to invent and nothing to draw. */
@@ -36,8 +34,6 @@ export const OWN_CAST_STAGES: Stage[] = [
   { label: "Reading the characters you brought", by: "Muse Spark", seconds: 10 },
   { label: "Writing a story about them", by: "Muse Spark", seconds: 18 },
   { label: "Drawing the art, with no lettering on it", by: "Muse Image", seconds: 32 },
-  { label: "Finding the panels", by: "SAM 3.1", seconds: 20 },
-  { label: "Laying the lettering over it", by: "SAM 3.1", seconds: 8 },
 ];
 
 export function Pipeline({ stages, startedAt }: { stages: Stage[]; startedAt: number }) {

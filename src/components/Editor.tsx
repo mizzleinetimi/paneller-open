@@ -432,9 +432,10 @@ export default function Editor() {
 
   const {
     addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage,
-    pageIndex, startStory, appendPage, goToPage, removePage,
+    pageIndex, startStory, appendPageAt, goToPage, removePage, furnish,
     library, newComic, openComic, forgetComic,
   } = useEditor();
+  const [furnishing, setFurnishing] = useState(false);
 
   const page = doc.pages[pageIndex];
   const started = doc.pages.some(hasArt);
@@ -530,19 +531,51 @@ export default function Editor() {
     if (!out) return;
     const img = new window.Image();
     img.onload = () => {
+      // The drawn page goes up at once, with nothing on it yet.
       const made = {
         source: out.image,
         width: img.naturalWidth,
         height: img.naturalHeight,
-        // Square the detection up before anyone sees it.
-        panels: tidyPanels(out.panels, img.naturalWidth, img.naturalHeight),
-        bubbles: out.bubbles,
+        panels: [],
+        bubbles: [],
         plan: out.plan,
       };
-      if (carryOn) appendPage(made);
-      else startStory(out.story ?? { title: doc.title, setting: "", cast: [], style: "classic" }, made);
+      const pageId = carryOn
+        ? appendPageAt(made)
+        : startStory(out.story ?? { title: doc.title, setting: "", cast: [], style: "classic" }, made);
+      void furnishPage(pageId, out.image, img.naturalWidth, img.naturalHeight, out.plan);
     };
     img.src = out.image;
+  };
+
+  /**
+   * Finds the panels and letters them, with the page already on screen. It
+   * runs quietly: there is something to look at, and if it fails the page is
+   * still there to be drawn on by hand.
+   */
+  const furnishPage = async (
+    pageId: string,
+    image: string,
+    width: number,
+    height: number,
+    plan: unknown,
+  ) => {
+    setFurnishing(true);
+    try {
+      const res = await fetch("/api/furnish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image, plan }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not read that page.");
+      // Square the detection up before anyone sees it.
+      furnish(pageId, tidyPanels(json.panels, width, height), json.bubbles);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : "Could not find the panels on that page.");
+    } finally {
+      setFurnishing(false);
+    }
   };
 
   const readLettering = async () => {
@@ -644,7 +677,7 @@ export default function Editor() {
               <button className="btn btn-hollow" onClick={() => addBubble("speech")} disabled={working}>Speech</button>
               <button className="btn btn-hollow" onClick={() => addBubble("caption")} disabled={working}>Caption</button>
               <button className="btn btn-hollow" onClick={() => addBubble("sfx")} disabled={working}>Sound</button>
-              <button className="btn btn-hollow" onClick={() => void readLettering()} disabled={!hasArt(page) || !page.bubbles.length || working}>
+              <button className="btn btn-hollow" onClick={() => void readLettering()} disabled={!hasArt(page) || !page.bubbles.length || working || furnishing}>
                 Read lettering
               </button>
               <select
@@ -663,7 +696,7 @@ export default function Editor() {
               <button
                 className={`btn ${adjusting ? "btn-key" : "btn-hollow"}`}
                 onClick={() => setAdjusting((v) => !v)}
-                disabled={working}
+                disabled={working || furnishing || !page.panels.length}
                 title="Drag panel corners to cover the whole frame"
               >
                 {adjusting ? "Done adjusting" : "Adjust panels"}
@@ -680,6 +713,12 @@ export default function Editor() {
         )}
 
         <span className="flex-1" />
+        {furnishing && (
+          <span className="flex items-center gap-1.5 text-[12px] text-ink-soft">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+            Finding the panels and lettering them...
+          </span>
+        )}
         {problem && (
           <span className="max-w-sm text-[12px] font-bold leading-tight text-[var(--danger)]">{problem}</span>
         )}

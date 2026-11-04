@@ -9,8 +9,6 @@ import {
   planStory,
   readCast,
 } from "@/lib/compose";
-import { detectPage } from "@/lib/detect";
-import { letterPage } from "@/lib/letter";
 import { readable } from "@/lib/errors";
 
 export const maxDuration = 300;
@@ -33,10 +31,12 @@ type Body = {
 };
 
 /**
- * Plans a page, draws it clean, reads its panels and letters it.
+ * Plans a page and draws it. Nothing else.
  *
- * One request, because a page is no use in pieces: a plan with no drawing, or
- * a drawing with no panels, is not something the editor can open.
+ * Finding the panels and laying the lettering over them take another half a
+ * minute between them, and there is no reason to look at nothing while they
+ * happen: the drawn page is worth showing the moment it exists. `/api/furnish`
+ * takes it from there, against a page already on screen.
  */
 export async function POST(request: Request) {
   try {
@@ -81,36 +81,10 @@ export async function POST(request: Request) {
     const { image, lostContinuity } = drawn;
     bible = { ...bible, cast };
 
-    // The art is clean, so the only thing worth finding is the panels; the
-    // lettering is laid over them from the plan that drew them.
-    const found = await detectPage(image);
-    const bubbles = await letterPage(image, found.panels, plan);
-
-    // Panels come back in reading order, which is the order they were planned
-    // in, so each one can carry the line of script it was drawn from.
-    const panels = found.panels.map((panel, i) => {
-      const said = plan.panels[i];
-      if (!said) return panel;
-      return {
-        ...panel,
-        script: said.description,
-        size: said.size,
-        said: {
-          ...(said.speech ? { speech: said.speech } : {}),
-          ...(said.speaker ? { speaker: said.speaker } : {}),
-          ...(said.sfx ? { sfx: said.sfx } : {}),
-          ...(said.caption ? { caption: said.caption } : {}),
-        },
-      };
-    });
-
     return Response.json({
       image,
       plan,
       story: { ...bible, style: styleName },
-      panels,
-      bubbles,
-      counts: { ...found.counts, lettered: bubbles.length },
       ...(lostContinuity
         ? {
             warning:
