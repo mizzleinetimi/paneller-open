@@ -42,7 +42,15 @@ export type Bubble = {
 /** What the page was planned as, kept so later pages know what has happened. */
 export type PageMemo = {
   setting: string;
-  panels: { description: string; speech?: string; speaker?: string; sfx?: string; caption?: string }[];
+  layout?: string;
+  panels: {
+    description: string;
+    size?: string;
+    speech?: string;
+    speaker?: string;
+    sfx?: string;
+    caption?: string;
+  }[];
 };
 
 export type Page = {

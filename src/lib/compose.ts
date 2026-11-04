@@ -22,10 +22,17 @@ export type StoryBible = {
   cast: { who: string; look: string }[];
 };
 
+/** How much of the page a panel takes, which is how a comic paces itself. */
+export type PanelSize = "wide" | "tall" | "small" | "big" | "full";
+
 export type PagePlan = {
   setting: string;
+  /** How the panels sit on the page, in a line, for the drawing prompt. */
+  layout?: string;
   panels: {
     description: string;
+    /** Its weight on the page. A page of equal boxes reads flat. */
+    size?: PanelSize;
     speech?: string;
     /**
      * Who says it, described by how they look rather than named: a segmentation
@@ -40,7 +47,9 @@ export type PagePlan = {
 
 const MAX_PANELS = 6;
 
-const PANEL_RULES = `For each panel say what is drawn - who is in it, what they are doing, where the camera is - in one or two sentences. Give a panel spoken words only where someone speaks, a sound effect only where there is a noise, a caption only where narration is needed. Keep dialogue short: it has to fit in a bubble.
+const PANEL_RULES = `Give the page a layout that is not a uniform grid. A comic paces itself by panel size: a wide panel to establish a place, small ones for quick beats, a big one for the moment that matters. Give each panel a "size" - one of "wide" (full width, short), "tall" (half width, full height), "small" (a quick beat), "big" (the moment of the page) or "full" (the whole page) - and give "layout": one line saying how they sit, such as "a wide panel across the top, two small ones beneath it, then a big panel across the bottom". Never make every panel the same size.
+
+For each panel say what is drawn - who is in it, what they are doing, where the camera is - in one or two sentences. Give a panel spoken words only where someone speaks, a sound effect only where there is a noise, a caption only where narration is needed. Keep dialogue short: it has to fit in a bubble.
 
 Where a panel has spoken words, also give "speaker": who says them, described by how they look in two to five words, as someone pointing at the page would say it - "woman in a yellow headwrap", "boy in a blue shirt", "man in a grey suit". Never a name, and never a pronoun: this is used to find them in the picture. Use exactly the same words for a character every time they appear.`;
 
@@ -72,7 +81,7 @@ Leave out speech, speaker, sfx or caption where the panel has none.`;
   if (!out.panels?.length) throw new Error("Muse Spark returned a page with no panels.");
   return {
     bible: { title: out.title ?? "Untitled comic", setting: out.setting, cast: out.cast ?? [] },
-    plan: { setting: out.setting, panels: out.panels.slice(0, MAX_PANELS) },
+    plan: { setting: out.setting, layout: out.layout, panels: out.panels.slice(0, MAX_PANELS) },
   };
 }
 
@@ -87,6 +96,7 @@ export async function planNextPage(
   const story = soFar
     .map((page, i) => `Page ${i + 1}: ${page.panels.map((p) => p.description).join(" ")}`)
     .join("\n");
+  const used = soFar.map((p) => p.layout).filter(Boolean);
 
   const instruction = `Carry on this comic with its next page.
 
@@ -101,15 +111,16 @@ ${story}
 What happens on this page: ${what}
 
 Give it ${count} panels. Use the cast's looks exactly as written above, word for word, so the same person is described the same way on every page.
+${used.length ? `\nThe pages before this one were laid out like this:\n${used.map((l, i) => `Page ${i + 1}: ${l}`).join("\n")}\n\nLay this page out differently from all of them. A comic where every page has the same arrangement of panels reads as flat as one where every panel is the same size. Put the big panel somewhere else, or start with something other than a wide establishing shot.` : ""}
 
 ${PANEL_RULES}
 
 Reply with only JSON of this shape, no commentary:
-{"setting":"...","panels":[{"description":"...","speech":"...","speaker":"...","sfx":"...","caption":"..."}]}`;
+{"setting":"...","layout":"...","panels":[{"description":"...","size":"...","speech":"...","speaker":"...","sfx":"...","caption":"..."}]}`;
 
   const plan = await askJson<PagePlan>([{ type: "text", text: instruction }], { maxTokens: 6000 });
   if (!plan.panels?.length) throw new Error("Muse Spark returned a page with no panels.");
-  return { setting: plan.setting ?? bible.setting, panels: plan.panels.slice(0, MAX_PANELS) };
+  return { setting: plan.setting ?? bible.setting, layout: plan.layout, panels: plan.panels.slice(0, MAX_PANELS) };
 }
 
 /** Turns an idea into a plan for one page. */
@@ -153,7 +164,15 @@ export function pagePrompt(plan: PagePlan, style: string): string {
     })
     .join("\n");
 
-  return `A comic book page with ${plan.panels.length} panels in a clear grid, separated by clean white gutters.
+  const sizes = plan.panels
+    .map((p, i) => (p.size ? `Panel ${i + 1} is ${SIZE_WORDS[p.size] ?? p.size}.` : null))
+    .filter(Boolean)
+    .join(" ");
+
+  return `A comic book page of ${plan.panels.length} panels, separated by clean white gutters.
+
+Layout: ${plan.layout ?? "vary the panel sizes; do not draw a uniform grid"}. ${sizes}
+The panels are different sizes and shapes, as on a real comic page.
 
 Setting, the same in every panel: ${plan.setting}
 
@@ -163,6 +182,14 @@ ${style}
 
 Important: draw artwork only. NO speech balloons, NO speech bubbles, NO caption boxes, NO sound effects, NO text, NO words, NO lettering, NO panel numbers, NO title. Every panel is pure illustration.`;
 }
+
+const SIZE_WORDS: Record<string, string> = {
+  wide: "a wide panel running the full width of the page, not tall",
+  tall: "a tall panel running the full height of its column",
+  small: "a small panel, narrower than the others",
+  big: "the largest panel on the page",
+  full: "a single panel filling the whole page",
+};
 
 export const STYLES: Record<string, string> = {
   classic: "Bold ink lines, flat colour, printed comic look.",
