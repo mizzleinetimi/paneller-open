@@ -56,5 +56,10 @@ export async function castSheetFrom(sources: string[]): Promise<string | undefin
     x += widths[i] + GAP;
   });
 
-  return canvas.toDataURL("image/webp", 0.92);
+  // Ask for WebP, but check: a browser that cannot encode it hands back a PNG
+  // without saying so, and then the picture and its label disagree. JPEG is
+  // the fallback because every browser can write it.
+  const webp = canvas.toDataURL("image/webp", 0.92);
+  if (webp.startsWith("data:image/webp")) return webp;
+  return canvas.toDataURL("image/jpeg", 0.92);
 }

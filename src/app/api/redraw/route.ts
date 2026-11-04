@@ -1,5 +1,5 @@
 import { readable } from "@/lib/errors";
-import { editImage, generateImage } from "@/lib/meta/client";
+import { attach, editImage, generateImage } from "@/lib/meta/client";
 
 export const maxDuration = 180;
 
@@ -20,10 +20,9 @@ export async function POST(request: Request) {
       return Response.json({ art: `data:image/webp;base64,${b64}` });
     }
 
-    const bytes = Buffer.from(art.replace(/^data:image\/\w+;base64,/, ""), "base64");
     const [b64] = await editImage({
       prompt: `Redraw this comic panel. Keep the same art style, line weight and colouring. Draw artwork only: no speech balloons, no caption boxes, no lettering of any kind. ${prompt}`,
-      images: [{ bytes, name: "panel.webp", type: "image/webp" }],
+      images: [attach(art, "panel")],
     });
     return Response.json({ art: `data:image/webp;base64,${b64}` });
   } catch (e) {

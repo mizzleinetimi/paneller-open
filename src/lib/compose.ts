@@ -8,7 +8,7 @@ import "server-only";
 // ordinary page in the editor - the panels are yours to redraw, the lettering
 // yours to change, and nothing is baked in.
 
-import { ContentFiltered, editImage, generateImage } from "./meta/client";
+import { ContentFiltered, attach, editImage, generateImage } from "./meta/client";
 import { askJson } from "./meta/text";
 
 /**
@@ -239,11 +239,7 @@ export async function drawPlan(
     ? ` The same people appear: ${reference.cast.join(", ")}. Keep each of them looking exactly as they do in the reference - same face, same clothes, same colours.`
     : "";
   const many = reference.images.length > 1;
-  const images = reference.images.map((image, i) => ({
-    bytes: Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), "base64"),
-    name: `reference-${i + 1}.webp`,
-    type: "image/webp",
-  }));
+  const images = reference.images.map((image, i) => attach(image, `reference-${i + 1}`));
 
   try {
     const [b64] = await editImage({

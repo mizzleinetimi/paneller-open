@@ -90,6 +90,28 @@ export async function generateImage(opts: { prompt: string; size?: string; n?: n
 
 export type InputImage = { bytes: Uint8Array; name: string; type?: string };
 
+const EXTENSION: Record<string, string> = {
+  "image/webp": "webp",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+};
+
+/**
+ * Turns a data URL into something to attach, keeping the type it really is.
+ *
+ * Never assume: `canvas.toDataURL("image/webp")` quietly hands back a PNG
+ * where WebP encoding is not supported, Safari among them. Declaring one type
+ * and sending the bytes of another is rejected, and the message blames the
+ * media rather than the label.
+ */
+export function attach(dataUrl: string, name = "image"): InputImage {
+  const match = /^data:(image\/[\w+.-]+);base64,/.exec(dataUrl);
+  const type = match?.[1] ?? "image/png";
+  const bytes = Buffer.from(dataUrl.replace(/^data:[^,]+,/, ""), "base64");
+  return { bytes, name: `${name}.${EXTENSION[type] ?? "png"}`, type };
+}
+
 /**
  * Edits one image, or composes several into one scene. `size` sets the aspect
  * ratio, not exact pixels.
