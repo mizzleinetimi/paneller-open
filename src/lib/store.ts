@@ -6,6 +6,7 @@
 
 import { create } from "zustand";
 import { adoptLegacy, deleteComic as dropComic, readComic, readIndex, thumbnail, writeComic } from "./library";
+import { sliceIntoPanels } from "./slice";
 import {
   type Bubble,
   type BubbleKind,
@@ -43,6 +44,8 @@ type State = {
   updateBubble: (id: string, patch: Partial<Bubble>, live?: boolean) => void;
   addBubble: (kind: BubbleKind) => void;
   remove: (selection: NonNullable<Selection>) => void;
+  /** Exchanges two panels' art, so a page can be re-ordered by dragging. */
+  swapPanels: (a: string, b: string) => void;
   setDoc: (doc: Doc) => void;
   newComic: () => void;
   openComic: (id: string) => Promise<void>;
@@ -59,7 +62,8 @@ type State = {
 };
 
 export type NewPage = {
-  art: string;
+  /** The whole page as one picture, when it still is one. */
+  art?: string;
   width: number;
   height: number;
   panels: Panel[];
@@ -82,8 +86,15 @@ type Setter = (partial: Partial<State>) => void;
 
 /** Writes a comic and refreshes the shelf; the first page becomes its cover. */
 async function save(doc: Doc, set: Setter) {
-  const cover = await thumbnail(doc.pages[0]?.art);
+  const first = doc.pages[0];
+  const cover = await thumbnail(first?.art ?? first?.panels.find((p) => p.art)?.art?.src);
   set({ library: await writeComic(doc, cover) });
+}
+
+/** Cuts any page that is still one flat picture into its panels. */
+async function sliced(doc: Doc): Promise<Doc> {
+  const pages = await Promise.all(doc.pages.map(sliceIntoPanels));
+  return pages.some((p, i) => p !== doc.pages[i]) ? { ...doc, pages } : doc;
 }
 
 const mapPage = (doc: Doc, index: number, f: (page: Page) => Page): Doc => ({
@@ -174,6 +185,29 @@ export const useEditor = create<State>((set, get) => ({
     set({ selection: null });
   },
 
+  swapPanels: (a, b) => {
+    if (a === b) return;
+    get().commit((doc) =>
+      mapPage(doc, get().pageIndex, (page) => {
+        const first = page.panels.find((p) => p.id === a);
+        const second = page.panels.find((p) => p.id === b);
+        if (!first || !second) return page;
+        // The frames stay where they are; what is drawn in them trades places,
+        // along with the script that goes with it.
+        return {
+          ...page,
+          panels: page.panels.map((p) =>
+            p.id === a
+              ? { ...p, art: second.art, script: second.script, said: second.said }
+              : p.id === b
+                ? { ...p, art: first.art, script: first.script, said: first.said }
+                : p,
+          ),
+        };
+      }),
+    );
+  },
+
   setDoc: (doc) => get().commit(() => doc),
 
   newComic: () => {
@@ -182,8 +216,11 @@ export const useEditor = create<State>((set, get) => ({
   },
 
   openComic: async (id) => {
-    const doc = await readComic(id);
-    if (doc) set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
+    const found = await readComic(id);
+    if (!found) return;
+    const doc = await sliced(found);
+    set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
+    if (doc !== found) void save(doc, set);
   },
 
   forgetComic: async (id) => {
@@ -244,7 +281,10 @@ export const useEditor = create<State>((set, get) => ({
   restore: async () => {
     await adoptLegacy();
     const library = await readIndex();
-    const latest = library[0] ? await readComic(library[0].id) : undefined;
-    set(latest?.pages?.length ? { doc: latest, library, loaded: true } : { library, loaded: true });
+    const found = library[0] ? await readComic(library[0].id) : undefined;
+    if (!found?.pages?.length) return set({ library, loaded: true });
+    const doc = await sliced(found);
+    set({ doc, library, loaded: true });
+    if (doc !== found) void save(doc, set);
   },
 }));

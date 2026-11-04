@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Circle, Group, Image as KImage, Layer, Line, Rect, Shape, Stage, Text } from "react-konva";
+import { Circle, Group, Image as KImage, Label, Layer, Line, Rect, Shape, Stage, Tag, Text } from "react-konva";
 import type Konva from "konva";
 import { FAMILY, balloonPath, measure } from "@/lib/bubble";
-import { type Bubble, type Panel, bounds, flatten } from "@/lib/doc";
+import { type Bubble, type Panel, bounds, flatten, reshape, shift } from "@/lib/doc";
 import { useEditor } from "@/lib/store";
 
 /**
@@ -26,16 +26,31 @@ function useImage(src: string | undefined) {
   return loaded && loaded.src === src ? loaded.img : undefined;
 }
 
+const HANDLES = [
+  { id: "nw", fx: 0, fy: 0 },
+  { id: "ne", fx: 1, fy: 0 },
+  { id: "se", fx: 1, fy: 1 },
+  { id: "sw", fx: 0, fy: 1 },
+] as const;
+
 function PanelShape({
   panel,
   selected,
-  hasPageArt,
+  index,
+  zoom,
+  onPageArt,
   onZoom,
+  onDropOn,
 }: {
   panel: Panel;
   selected: boolean;
-  hasPageArt: boolean;
+  index: number;
+  zoom: number;
+  /** The page still has one flat picture under the panels. */
+  onPageArt: boolean;
   onZoom: (to: { x: number; y: number; width: number; height: number }) => void;
+  /** Where a panel was let go. True if it landed on another and they traded. */
+  onDropOn: (id: string, at: { x: number; y: number }) => boolean;
 }) {
   const { select, updatePanel } = useEditor();
   const art = useImage(panel.art?.src);
@@ -47,8 +62,34 @@ function PanelShape({
   const onDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const { x, y } = e.target.position();
     e.target.position({ x: 0, y: 0 });
-    if (x || y) updatePanel(panel.id, { shape: panel.shape.map((p) => ({ x: p.x + x, y: p.y + y })) });
+    if (!x && !y) return;
+    // Dropped on top of another panel, the two trade what they hold and this
+    // one goes back where it was: a swap is not also a move.
+    const swapped = onDropOn(panel.id, { x: box.x + box.width / 2 + x, y: box.y + box.height / 2 + y });
+    if (!swapped) updatePanel(panel.id, { shape: shift(panel.shape, x, y) });
   };
+
+  /**
+   * Drags one corner, keeping the one opposite it still.
+   *
+   * Only once the corner is let go. The handle sits where the panel's box puts
+   * it, so resizing while dragging moves the handle out from under the cursor
+   * and the next move compounds the last - which collapsed a panel to a sliver
+   * in one gesture. Let go, then measure.
+   */
+  const resize = (corner: (typeof HANDLES)[number], at: { x: number; y: number }) => {
+    const anchor = { x: corner.fx ? box.x : box.x + box.width, y: corner.fy ? box.y : box.y + box.height };
+    const min = 40;
+    const to = {
+      x: Math.min(anchor.x, at.x),
+      y: Math.min(anchor.y, at.y),
+      width: Math.max(min, Math.abs(at.x - anchor.x)),
+      height: Math.max(min, Math.abs(at.y - anchor.y)),
+    };
+    updatePanel(panel.id, { shape: reshape(panel.shape, to) });
+  };
+
+  const line = selected ? "var(--accent)" : "#111111";
 
   return (
     <Group
@@ -67,17 +108,49 @@ function PanelShape({
           ctx.closePath();
         }}
       >
-        {!hasPageArt && <Rect x={box.x} y={box.y} width={box.width} height={box.height} fill="#f1f1ef" />}
-        {art && panel.art && (
-          <KImage image={art} x={panel.art.x} y={panel.art.y} width={panel.art.width} height={panel.art.height} />
+        {/* Only stand in for art when there is none underneath either. */}
+        {!art && !onPageArt && (
+          <Rect x={box.x} y={box.y} width={box.width} height={box.height} fill="#e9e4d8" />
         )}
+        {art && <KImage image={art} x={box.x} y={box.y} width={box.width} height={box.height} />}
       </Group>
-      <Line
-        points={flatten(panel.shape)}
-        closed
-        stroke={selected ? "#2563eb" : "#111111"}
-        strokeWidth={selected ? 6 : 4}
-      />
+
+      <Line points={flatten(panel.shape)} closed stroke={line} strokeWidth={selected ? 7 / zoom + 2 : 4} />
+
+      {selected && (
+        <>
+          {/* A wash over the panel, so which one is picked is never in doubt. */}
+          <Line points={flatten(panel.shape)} closed fill="var(--accent)" opacity={0.12} listening={false} />
+          <Label x={box.x} y={box.y} offsetY={26 / zoom} listening={false}>
+            <Tag fill="var(--accent)" cornerRadius={3 / zoom} />
+            <Text
+              text={` ${index + 1} `}
+              fill="#ffffff"
+              fontStyle="bold"
+              fontSize={16 / zoom}
+              padding={4 / zoom}
+            />
+          </Label>
+          {HANDLES.map((h) => (
+            <Rect
+              key={h.id}
+              x={box.x + h.fx * box.width - 7 / zoom}
+              y={box.y + h.fy * box.height - 7 / zoom}
+              width={14 / zoom}
+              height={14 / zoom}
+              fill="#ffffff"
+              stroke="var(--accent)"
+              strokeWidth={3 / zoom}
+              draggable
+              onDragEnd={(e) => {
+                const at = e.target.getAbsolutePosition(e.target.getLayer()!);
+                // The handle is drawn from its top-left; measure from its middle.
+                resize(h, { x: at.x + 7 / zoom, y: at.y + 7 / zoom });
+              }}
+            />
+          ))}
+        </>
+      )}
     </Group>
   );
 }
@@ -301,6 +374,18 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
     }
   };
 
+  /** Dropping a panel on top of another trades what the two of them hold. */
+  const dropPanel = (id: string, at: { x: number; y: number }) => {
+    const onto = page.panels.find((p) => {
+      if (p.id === id) return false;
+      const b = bounds(p.shape);
+      return at.x >= b.x && at.x <= b.x + b.width && at.y >= b.y && at.y <= b.y + b.height;
+    });
+    if (!onto) return false;
+    useEditor.getState().swapPanels(id, onto.id);
+    return true;
+  };
+
   const step = (by: number) => zoomAt(current.zoom * by, { x: size.width / 2, y: size.height / 2 });
 
   return (
@@ -332,12 +417,15 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
             shadowOffset={{ x: 0, y: 6 / current.zoom }}
           />
           {pageArt && <KImage image={pageArt} width={page.width} height={page.height} listening={false} />}
-          {page.panels.map((panel) => (
+          {page.panels.map((panel, i) => (
             <PanelShape
               key={panel.id}
               panel={panel}
-              hasPageArt={Boolean(page.art)}
+              index={i}
+              zoom={current.zoom}
+              onPageArt={Boolean(page.art)}
               onZoom={(box) => frame(box, 24)}
+              onDropOn={dropPanel}
               selected={selection?.kind === "panel" && selection.id === panel.id}
             />
           ))}

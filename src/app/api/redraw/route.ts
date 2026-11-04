@@ -1,25 +1,33 @@
-import type { Panel } from "@/lib/doc";
-import { drawPanel, redrawPanel } from "@/lib/draw";
-
 import { readable } from "@/lib/errors";
+import { editImage, generateImage } from "@/lib/meta/client";
 
 export const maxDuration = 180;
 
-/** With a page, redraws the panel in place; without one, draws the panel alone. */
+/**
+ * Redraws one panel. A panel owns its art, so only that picture is sent and
+ * only that picture comes back: the rest of the page is never in the request
+ * and so cannot drift. With no art yet, the panel is drawn from the prompt.
+ */
 export async function POST(request: Request) {
   try {
-    const { image, panel, prompt } = (await request.json()) as {
-      image?: string;
-      panel?: Panel;
-      prompt?: string;
-    };
-    if (!panel || !prompt) return Response.json({ error: "Send a panel and a prompt." }, { status: 400 });
-    if (image) return Response.json({ page: await redrawPanel(image, panel, prompt) });
+    const { art, prompt } = (await request.json()) as { art?: string; prompt?: string };
+    if (!prompt?.trim()) return Response.json({ error: "Say what to change." }, { status: 400 });
 
-    const { width, height } = await import("@/lib/doc").then((m) => m.bounds(panel.shape));
-    return Response.json({ art: await drawPanel(prompt, width, height) });
+    if (!art) {
+      const [b64] = await generateImage({
+        prompt: `A single comic book panel, no border, no speech bubbles, no lettering. ${prompt}`,
+      });
+      return Response.json({ art: `data:image/webp;base64,${b64}` });
+    }
+
+    const bytes = Buffer.from(art.replace(/^data:image\/\w+;base64,/, ""), "base64");
+    const [b64] = await editImage({
+      prompt: `Redraw this comic panel. Keep the same art style, line weight and colouring. Draw artwork only: no speech balloons, no caption boxes, no lettering of any kind. ${prompt}`,
+      images: [{ bytes, name: "panel.webp", type: "image/webp" }],
+    });
+    return Response.json({ art: `data:image/webp;base64,${b64}` });
   } catch (e) {
-    console.error(`/api/redraw failed:`, e);
+    console.error("/api/redraw failed:", e);
     return Response.json({ error: readable(e, "panel") }, { status: 500 });
   }
 }

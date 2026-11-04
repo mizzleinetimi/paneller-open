@@ -44,7 +44,7 @@ export async function adoptLegacy(): Promise<void> {
   const old = await idbGet<Doc>(LEGACY).catch(() => undefined);
   if (!old?.pages?.length) return;
   const id = old.id ?? `comic_legacy`;
-  const cover = await thumbnail(old.pages[0]?.art);
+  const cover = await thumbnail(old.pages[0]?.art ?? old.pages[0]?.panels.find((p) => p.art)?.art?.src);
   await writeComic({ ...old, id, title: old.story?.title ?? old.title ?? "Untitled comic" }, cover);
   await idbDel(LEGACY);
 }

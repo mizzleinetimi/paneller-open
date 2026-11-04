@@ -10,8 +10,11 @@ export type Panel = {
   id: string;
   /** Closed polygon in page coordinates, clockwise from the top left. */
   shape: Point[];
-  /** Art drawn inside the polygon, which clips it. */
-  art?: { src: string; x: number; y: number; width: number; height: number };
+  /**
+   * The art this panel holds, drawn to fill whatever box the panel occupies
+   * now - so moving or resizing the panel carries its picture with it.
+   */
+  art?: { src: string };
   /** What this panel was planned as: the line of script it was drawn from. */
   script?: string;
   /** Its weight on the page, as planned. */
@@ -110,6 +113,24 @@ export function bounds(shape: Point[]): { x: number; y: number; width: number; h
   return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 }
 
+/** Fits a polygon into a new box, keeping its shape. */
+export function reshape(
+  shape: Point[],
+  to: { x: number; y: number; width: number; height: number },
+): Point[] {
+  const from = bounds(shape);
+  const sx = from.width === 0 ? 1 : to.width / from.width;
+  const sy = from.height === 0 ? 1 : to.height / from.height;
+  return shape.map((p) => ({
+    x: to.x + (p.x - from.x) * sx,
+    y: to.y + (p.y - from.y) * sy,
+  }));
+}
+
+/** Moves a polygon by an offset. */
+export const shift = (shape: Point[], dx: number, dy: number): Point[] =>
+  shape.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+
 /** Konva wants a flat [x,y,x,y,...] list. */
 export const flatten = (shape: Point[]): number[] => shape.flatMap((p) => [p.x, p.y]);
 
@@ -129,6 +150,9 @@ export function emptyPage(width = 1280, height = 1920): Page {
     bubbles: [],
   };
 }
+
+/** A page has something on it once it, or any of its panels, holds art. */
+export const hasArt = (page: Page): boolean => Boolean(page.art) || page.panels.some((p) => p.art);
 
 export const emptyDoc = (): Doc => ({ id: newId("comic"), title: "Untitled comic", pages: [emptyPage()] });
 

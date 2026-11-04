@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import { CONTINUE_STAGES, MAKE_STAGES, Pipeline, type Stage } from "./Pipeline";
-import { bounds as boundsOf } from "@/lib/doc";
+import { hasArt } from "@/lib/doc";
+import { sliceIntoPanels } from "@/lib/slice";
 import { useEditor } from "@/lib/store";
 
 // Konva draws to a canvas and needs a window, so it must not be prerendered.
@@ -364,7 +365,7 @@ export default function Editor() {
   } = useEditor();
 
   const page = doc.pages[pageIndex];
-  const started = Boolean(doc.pages.some((p) => p.art));
+  const started = doc.pages.some(hasArt);
   const carryOn = Boolean(doc.story && started);
 
   useEffect(() => { void restore(); }, [restore]);
@@ -454,17 +455,28 @@ export default function Editor() {
     if (!out) return;
     const img = new window.Image();
     img.onload = () => {
-      const made = {
-        art: out.image,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        panels: out.panels,
-        bubbles: out.bubbles,
-        plan: out.plan,
-      };
-      if (carryOn) appendPage(made);
-      else if (out.story) startStory(out.story, made);
-      else openPage(out.image, img.naturalWidth, img.naturalHeight, out);
+      void (async () => {
+        const cut = await sliceIntoPanels({
+          id: "",
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          background: "#ffffff",
+          art: out.image,
+          panels: out.panels,
+          bubbles: out.bubbles,
+        });
+        const made = {
+          art: cut.art,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          panels: cut.panels,
+          bubbles: out.bubbles,
+          plan: out.plan,
+        };
+        if (carryOn) appendPage(made);
+        else if (out.story) startStory(out.story, made);
+        else openPage(out.image, img.naturalWidth, img.naturalHeight, out);
+      })();
     };
     img.src = out.image;
   };
@@ -473,7 +485,7 @@ export default function Editor() {
     const out = await call<{ bubbles: typeof page.bubbles }>(
       "Reading the lettering",
       "/api/read",
-      { image: page.art, bubbles: page.bubbles },
+      { image: flatten(), bubbles: page.bubbles },
       [{ label: "Reading the words in each bubble", by: "Muse Spark", seconds: 10 }],
     );
     if (out) useEditor.getState().setBubbles(out.bubbles);
@@ -493,23 +505,19 @@ export default function Editor() {
     if (selection?.kind !== "panel") return;
     const panel = page.panels.find((p) => p.id === selection.id);
     if (!panel) return;
-    const out = await call<{ page?: string; art?: string }>(
+    const out = await call<{ art?: string }>(
       "Redrawing the panel",
       "/api/redraw",
-      { image: page.art, panel, prompt },
+      { art: panel.art?.src, prompt },
       [{ label: "Redrawing this panel alone", by: "Muse Image", seconds: 35 }],
     );
-    if (out?.page) useEditor.getState().setPageArt(out.page);
-    else if (out?.art) useEditor.getState().updatePanel(panel.id, { art: { src: out.art, ...boundsOf(panel.shape) } });
+    if (out?.art) useEditor.getState().updatePanel(panel.id, { art: { src: out.art } });
   };
 
-  const exportPng = () => {
+  /** Draws the page as it stands into one picture, at its own size. */
+  const flatten = (): string | undefined => {
     const stage = stageRef.current;
-    if (!stage) return;
-    // The stage shows whatever the reader has zoomed to, which is not what
-    // they want in a file: the page is squared up at its own size, exported,
-    // and the view put back. Selection handles would be drawn too, so the
-    // selection goes first.
+    if (!stage) return undefined;
     useEditor.getState().select(null);
     const was = { x: stage.x(), y: stage.y(), zoom: stage.scaleX(), width: stage.width(), height: stage.height() };
     stage.position({ x: 0, y: 0 });
@@ -521,6 +529,12 @@ export default function Editor() {
     stage.scale({ x: was.zoom, y: was.zoom });
     stage.size({ width: was.width, height: was.height });
     stage.draw();
+    return url;
+  };
+
+  const exportPng = () => {
+    const url = flatten();
+    if (!url) return;
     const a = document.createElement("a");
     a.href = url;
     a.download = `${(doc.story?.title ?? doc.title).replace(/\W+/g, "-").toLowerCase()}-${pageIndex + 1}.png`;
@@ -566,7 +580,7 @@ export default function Editor() {
               <button className="btn btn-hollow" onClick={() => addBubble("speech")} disabled={working}>Speech</button>
               <button className="btn btn-hollow" onClick={() => addBubble("caption")} disabled={working}>Caption</button>
               <button className="btn btn-hollow" onClick={() => addBubble("sfx")} disabled={working}>Sound</button>
-              <button className="btn btn-hollow" onClick={() => void readLettering()} disabled={!page.art || !page.bubbles.length || working}>
+              <button className="btn btn-hollow" onClick={() => void readLettering()} disabled={!hasArt(page) || !page.bubbles.length || working}>
                 Read lettering
               </button>
               <select
