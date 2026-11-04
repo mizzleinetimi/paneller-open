@@ -97,6 +97,7 @@ function BubbleShape({
   const { select, updateBubble } = useEditor();
   const { id, kind, x, y, text, fontSize, tail, clear } = bubble;
   const pick = () => select({ kind: "bubble", id });
+  const groupRef = useRef<Konva.Group>(null);
 
   // The text decides the size unless the reader has set one by hand.
   const measured = useMemo(() => measure(text, kind, fontSize), [text, kind, fontSize]);
@@ -110,6 +111,7 @@ function BubbleShape({
   return (
     <>
       <Group
+        ref={groupRef}
         draggable
         x={x}
         y={y}
@@ -118,10 +120,20 @@ function BubbleShape({
         dragBoundFunc={(pos) => {
           // Keep it on the page: a bubble dragged off the edge is gone for good
           // at this zoom, with nothing left to grab.
+          //
+          // This is handed absolute coordinates on the stage, not coordinates
+          // on the page, and the stage is both scaled and panned. Clamping as
+          // though it sat at the origin is out by however far it has been
+          // panned, which is what made bubbles jump.
+          const stage = groupRef.current?.getStage();
+          if (!stage) return pos;
+          const zoom = stage.scaleX();
           const margin = 24;
+          const onPage = (v: number, offset: number, extent: number) =>
+            Math.min(Math.max(v, margin * zoom + offset), (extent - margin) * zoom + offset);
           return {
-            x: Math.min(Math.max(pos.x, margin * scale), (page.width - margin) * scale),
-            y: Math.min(Math.max(pos.y, margin * scale), (page.height - margin) * scale),
+            x: onPage(pos.x, stage.x(), page.width),
+            y: onPage(pos.y, stage.y(), page.height),
           };
         }}
         // The tail is anchored to whoever is speaking, so it stays where it is
