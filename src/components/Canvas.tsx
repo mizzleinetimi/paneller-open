@@ -203,6 +203,7 @@ function BubbleShape({
   const { id, kind, x, y, text, fontSize, tail, clear } = bubble;
   const pick = () => select({ kind: "bubble", id });
   const groupRef = useRef<Konva.Group>(null);
+  const tailRef = useRef<Konva.Circle>(null);
 
   // The text decides the size unless the reader has set one by hand.
   const measured = useMemo(() => measure(text, kind, fontSize), [text, kind, fontSize]);
@@ -213,6 +214,26 @@ function BubbleShape({
   // Balloon and tail are one closed path, so there is no seam where they meet.
   const localTail = tail ? { x: tail.x - x, y: tail.y - y } : undefined;
 
+  /**
+   * Keeps a point dragged on the stage within the page, `half` of a box around
+   * it included.
+   *
+   * Konva hands a drag bound absolute coordinates on the stage, and the stage
+   * is both scaled and panned, so the page's edges are converted to the same
+   * terms before clamping. Bounding only the middle let the rest of a wide
+   * balloon hang off the page and under the sidebar, out of reach.
+   */
+  const onPage = (node: Konva.Node | null, pos: { x: number; y: number }, half: { x: number; y: number }) => {
+    const stage = node?.getStage();
+    if (!stage) return pos;
+    const zoom = stage.scaleX();
+    const within = (v: number, offset: number, extent: number, h: number) => {
+      const lo = Math.min(h, extent / 2), hi = Math.max(extent - h, extent / 2);
+      return Math.min(Math.max(v, lo * zoom + offset), hi * zoom + offset);
+    };
+    return { x: within(pos.x, stage.x(), page.width, half.x), y: within(pos.y, stage.y(), page.height, half.y) };
+  };
+
   return (
     <>
       <Group
@@ -222,25 +243,9 @@ function BubbleShape({
         y={y}
         onMouseDown={pick}
         onTap={pick}
-        dragBoundFunc={(pos) => {
-          // Keep it on the page: a bubble dragged off the edge is gone for good
-          // at this zoom, with nothing left to grab.
-          //
-          // This is handed absolute coordinates on the stage, not coordinates
-          // on the page, and the stage is both scaled and panned. Clamping as
-          // though it sat at the origin is out by however far it has been
-          // panned, which is what made bubbles jump.
-          const stage = groupRef.current?.getStage();
-          if (!stage) return pos;
-          const zoom = stage.scaleX();
-          const margin = 24;
-          const onPage = (v: number, offset: number, extent: number) =>
-            Math.min(Math.max(v, margin * zoom + offset), (extent - margin) * zoom + offset);
-          return {
-            x: onPage(pos.x, stage.x(), page.width),
-            y: onPage(pos.y, stage.y(), page.height),
-          };
-        }}
+        // The whole balloon stays on the page; one dragged off the edge is gone
+        // for good at this zoom, with nothing left to grab.
+        dragBoundFunc={(pos) => onPage(groupRef.current, pos, { x: width / 2, y: height / 2 })}
         // The tail is anchored to whoever is speaking, so it stays where it is
         // and the balloon re-forms around it: move the balloon and the tail
         // stretches, turns and re-curves to keep pointing at the same head.
@@ -313,6 +318,8 @@ function BubbleShape({
           stroke="#ffffff"
           strokeWidth={3 / scale}
           draggable
+          ref={tailRef}
+          dragBoundFunc={(pos) => onPage(tailRef.current, pos, { x: 0, y: 0 })}
           onDragMove={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } }, true)}
           onDragEnd={(e) => updateBubble(id, { tail: { x: e.target.x(), y: e.target.y() } })}
         />
