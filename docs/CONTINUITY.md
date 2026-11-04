@@ -49,12 +49,23 @@ page two are the same image and so cost nothing extra.
 is worth repeating before anyone leans on it. `scripts/drift-test.ts` draws
 both chains.
 
-## Known: the bible and the drawing disagree
+## The cast is drawn once, first
 
-The cast's looks are written before anything is drawn, and the drawing does not
-always oblige - a page planned around "man in a red cap" came back with a dark
-cap. The description is then wrong about its own comic, which matters twice
-over, because that string is also what a balloon's tail is aimed by.
+Before any page, the whole cast is drawn standing in a row against a plain
+background and kept. Every page is then held against that sheet.
 
-Reading the looks back off the first page once it exists, rather than deciding
-them in advance, would fix both. Not done.
+One picture, however many characters. That matters: handing an image model
+more reference pictures makes it worse rather than better, so a sheet of six
+characters costs what a sheet of one does, where six separate portraits would
+not. It also never drifts. Chaining page to page means page five inherits page
+four's mistakes; a sheet is the same picture on page five as on page one.
+
+A page is drawn against the sheet and the page before it - the sheet for who
+the people are, the page before for where they are and what has just happened.
+
+The looks are then **read back off the sheet** rather than trusted as planned.
+They are written before anything exists and the drawing does not always oblige;
+a cast planned around "man in a red cap" can come back in a dark one, and the
+description is then wrong about its own comic. That matters twice, because the
+same words are what a balloon's tail is aimed by. Reading them back makes them
+true. It costs one call and happens while the first page is being drawn.

@@ -20,6 +20,14 @@ export type StoryBible = {
   title: string;
   setting: string;
   cast: { who: string; look: string }[];
+  /**
+   * The cast drawn once, side by side, and kept. Every page is drawn against
+   * it, so characters are anchored to one picture instead of to the page
+   * before - which drifts, each page faithful to the last and the last
+   * nothing like the first. One image however big the cast, which matters:
+   * handing a model more reference pictures makes it worse, not better.
+   */
+  sheet?: string;
 };
 
 /** How much of the page a panel takes, which is how a comic paces itself. */
@@ -259,4 +267,60 @@ export async function drawPage(
   const style = STYLES[opts.style ?? "classic"] ?? STYLES.classic;
   const { image } = await drawPlan(plan, style);
   return { image, plan };
+}
+
+
+/** Draws the cast once, to be the reference every page is held against. */
+export async function drawCastSheet(bible: StoryBible, style: string): Promise<string> {
+  const people = bible.cast.map((c, i) => `${i + 1}. ${c.who}, ${c.look}`).join("\n");
+  const [b64] = await generateImage({
+    prompt: `A character reference sheet for a comic: ${bible.cast.length} character${
+      bible.cast.length === 1 ? "" : "s"
+    } standing in a row against a plain flat background, full body, facing forward, arms at their sides, even lighting, no shadows. From left to right:
+
+${people}
+
+Each one must be told apart from the others at a glance, by their clothes and their colours rather than their faces. ${style}
+
+Draw the people only. NO text, NO labels, NO names, NO numbers, NO panels, NO borders, NO speech balloons.`,
+    size: "1536x1024",
+  });
+  return `data:image/webp;base64,${b64}`;
+}
+
+/**
+ * Describes the cast as they were actually drawn.
+ *
+ * The looks are written before anything exists, and the drawing does not
+ * always oblige: a cast planned around "man in a red cap" comes back in a dark
+ * one, and the description is then wrong about its own comic. That matters
+ * twice over, because the same words are what a speech balloon's tail is aimed
+ * by. Reading them back off the sheet makes the words true.
+ */
+export async function readCast(sheet: string, bible: StoryBible): Promise<StoryBible["cast"]> {
+  if (!bible.cast.length) return bible.cast;
+  const planned = bible.cast.map((c, i) => `${i + 1}. ${c.who}, meant to be: ${c.look}`).join("\n");
+  try {
+    const looks = await askJson<string[]>(
+      [
+        {
+          type: "text",
+          text: `This is a character sheet for a comic. From left to right it shows ${bible.cast.length} character${
+            bible.cast.length === 1 ? "" : "s"
+          }:
+
+${planned}
+
+Describe each one as they are actually drawn, not as they were meant to be, in two to five words, by clothing and colour - "man in a green apron", "girl in a yellow dress". No names, no pronouns: these are used to find each person in a picture, so they must tell them apart.
+
+Reply with only a JSON array of ${bible.cast.length} strings, in the same order.`,
+        },
+        { type: "image_url", image_url: { url: sheet } },
+      ],
+      { maxTokens: 4000 },
+    );
+    return bible.cast.map((c, i) => ({ ...c, look: looks[i]?.trim() || c.look }));
+  } catch {
+    return bible.cast; // The planned words are better than none.
+  }
 }

@@ -17,15 +17,16 @@ import { useEffect, useState } from "react";
 export type Stage = { label: string; by: string; seconds: number };
 
 export const MAKE_STAGES: Stage[] = [
-  { label: "Planning the panels and the dialogue", by: "Muse Spark", seconds: 16 },
-  { label: "Drawing the art, with no lettering on it", by: "Muse Image", seconds: 26 },
+  { label: "Planning the cast, the place and the panels", by: "Muse Spark", seconds: 16 },
+  { label: "Drawing the cast once, to hold every page against", by: "Muse Image", seconds: 26 },
+  { label: "Drawing the art, with no lettering on it", by: "Muse Image", seconds: 32 },
   { label: "Finding the panels", by: "SAM 3.1", seconds: 20 },
   { label: "Laying the lettering over it", by: "SAM 3.1", seconds: 8 },
 ];
 
 export const CONTINUE_STAGES: Stage[] = [
   { label: "Planning the next page from the story so far", by: "Muse Spark", seconds: 18 },
-  { label: "Drawing it against the pages before, to keep the cast", by: "Muse Image", seconds: 44 },
+  { label: "Drawing it against the cast sheet and the page before", by: "Muse Image", seconds: 44 },
   { label: "Finding the panels", by: "SAM 3.1", seconds: 20 },
   { label: "Laying the lettering over it", by: "SAM 3.1", seconds: 8 },
 ];

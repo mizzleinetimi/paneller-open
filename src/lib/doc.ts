@@ -89,6 +89,8 @@ export type Story = {
   title: string;
   setting: string;
   cast: { who: string; look: string }[];
+  /** The cast drawn once, which every page is held against. */
+  sheet?: string;
   style: string;
 };
 

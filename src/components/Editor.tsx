@@ -153,6 +153,17 @@ function StoryPanel() {
       <span className="label">The comic</span>
       <p className="text-sm font-medium leading-snug">{story.title}</p>
       <p className="text-[13px] leading-snug text-ink-soft">{story.setting}</p>
+      {story.sheet && (
+        <>
+          <span className="label mt-1">The cast, drawn once</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={story.sheet}
+            alt="The comic's cast"
+            className="w-full rounded border-2 border-[var(--line)] bg-[var(--paper-2)]"
+          />
+        </>
+      )}
       {story.cast.length > 0 && (
         <>
           <span className="label mt-1">Cast carried between pages</span>
@@ -165,8 +176,9 @@ function StoryPanel() {
             ))}
           </ul>
           <p className="text-[11px] text-ink-faint">
-            These words are used twice: later pages are drawn from them, and SAM 3.1 finds each
-            person by them to aim their speech balloon.
+            Read back off the sheet once it was drawn, so the words match the picture. They are
+            used twice: later pages are planned from them, and SAM 3.1 finds each person by them to
+            aim their speech balloon.
           </p>
         </>
       )}

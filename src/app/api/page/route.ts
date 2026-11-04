@@ -1,4 +1,13 @@
-import { STYLES, type PagePlan, type StoryBible, drawPlan, planNextPage, planStory } from "@/lib/compose";
+import {
+  STYLES,
+  type PagePlan,
+  type StoryBible,
+  drawCastSheet,
+  drawPlan,
+  planNextPage,
+  planStory,
+  readCast,
+} from "@/lib/compose";
 import { detectPage } from "@/lib/detect";
 import { letterPage } from "@/lib/letter";
 import { readable } from "@/lib/errors";
@@ -31,7 +40,7 @@ export async function POST(request: Request) {
     const style = STYLES[styleName] ?? STYLES.classic;
 
     let plan: PagePlan;
-    let bible: StoryBible | undefined;
+    let bible: StoryBible;
 
     if (body.what && body.story) {
       bible = body.story;
@@ -40,17 +49,26 @@ export async function POST(request: Request) {
       const started = await planStory(body.idea.trim(), body.panels);
       bible = started.bible;
       plan = started.plan;
+      // Draw the cast once, before any page, and hold every page against it.
+      bible.sheet = await drawCastSheet(bible, style);
     } else {
       return Response.json({ error: "Say what the page is about." }, { status: 400 });
     }
 
-    const { image, lostContinuity } = await drawPlan(
-      plan,
-      style,
-      body.reference?.length
-        ? { images: body.reference, cast: (bible?.cast ?? []).map((c) => c.look) }
-        : undefined,
+    // The sheet anchors the characters; the page before carries the place and
+    // what has just happened. Two references, and one of them never drifts.
+    const references = [bible.sheet, ...(body.reference ?? [])].filter(
+      (img, i, all): img is string => Boolean(img) && all.indexOf(img) === i,
     );
+
+    // Reading the cast back off the sheet only matters to later pages and to
+    // aiming balloons, so it happens while this page is being drawn.
+    const [drawn, cast] = await Promise.all([
+      drawPlan(plan, style, references.length ? { images: references, cast: bible.cast.map((c) => c.look) } : undefined),
+      bible.sheet && !body.what ? readCast(bible.sheet, bible) : Promise.resolve(bible.cast),
+    ]);
+    const { image, lostContinuity } = drawn;
+    bible = { ...bible, cast };
 
     // The art is clean, so the only thing worth finding is the panels; the
     // lettering is laid over them from the plan that drew them.
@@ -78,7 +96,7 @@ export async function POST(request: Request) {
     return Response.json({
       image,
       plan,
-      story: bible ? { ...bible, style: styleName } : undefined,
+      story: { ...bible, style: styleName },
       panels,
       bubbles,
       counts: { ...found.counts, lettered: bubbles.length },
