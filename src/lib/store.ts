@@ -5,8 +5,8 @@
 // calls `live` instead, so a drag is one undo step rather than sixty.
 
 import { create } from "zustand";
+import { tidyPanels } from "./tidy";
 import { adoptLegacy, deleteComic as dropComic, readComic, readIndex, thumbnail, writeComic } from "./library";
-import { sliceIntoPanels } from "./slice";
 import {
   type Bubble,
   type BubbleKind,
@@ -45,7 +45,7 @@ type State = {
 
   updatePanel: (id: string, patch: Partial<Panel>, live?: boolean) => void;
   /** Reshapes a panel and carries its lettering with it. */
-  reshapePanel: (id: string, shape: Point[], live?: boolean) => void;
+  reshapePanel: (id: string, shape: Point[], crop?: { x: number; y: number; width: number; height: number }) => void;
   updateBubble: (id: string, patch: Partial<Bubble>, live?: boolean) => void;
   addBubble: (kind: BubbleKind) => void;
   remove: (selection: NonNullable<Selection>) => void;
@@ -69,6 +69,8 @@ type State = {
 export type NewPage = {
   /** The whole page as one picture, when it still is one. */
   art?: string;
+  /** The drawn page panels crop their pictures from. */
+  source?: string;
   width: number;
   height: number;
   panels: Panel[];
@@ -82,6 +84,7 @@ const asPage = (p: NewPage): Page => ({
   height: p.height,
   background: "#ffffff",
   art: p.art,
+  source: p.source,
   panels: p.panels,
   bubbles: p.bubbles,
   plan: p.plan,
@@ -92,14 +95,40 @@ type Setter = (partial: Partial<State>) => void;
 /** Writes a comic and refreshes the shelf; the first page becomes its cover. */
 async function save(doc: Doc, set: Setter) {
   const first = doc.pages[0];
-  const cover = await thumbnail(first?.art ?? first?.panels.find((p) => p.art)?.art?.src);
+  const cover = await thumbnail(first?.source ?? first?.art ?? first?.panels.find((p) => p.art)?.art?.src);
   set({ library: await writeComic(doc, cover) });
 }
 
-/** Cuts any page that is still one flat picture into its panels. */
-async function sliced(doc: Doc): Promise<Doc> {
-  const pages = await Promise.all(doc.pages.map(sliceIntoPanels));
-  return pages.some((p, i) => p !== doc.pages[i]) ? { ...doc, pages } : doc;
+/**
+ * Brings a comic made before panels took their pictures from the page up to
+ * date: the page it was drawn from becomes the source every panel crops.
+ */
+function sliced(doc: Doc): Doc {
+  if (!doc.pages.some((p) => p.art && !p.source)) return doc;
+  return {
+    ...doc,
+    pages: doc.pages.map((page) =>
+      page.art && !page.source
+        ? {
+            ...page,
+            source: page.art,
+            art: undefined,
+            panels: tidyPanels(page.panels, page.width, page.height),
+            bubbles: page.bubbles.map((b) =>
+              b.panelId
+                ? b
+                : {
+                    ...b,
+                    panelId: page.panels.find((panel) => {
+                      const box = bounds(panel.shape);
+                      return b.x >= box.x && b.x <= box.x + box.width && b.y >= box.y && b.y <= box.y + box.height;
+                    })?.id,
+                  },
+            ),
+          }
+        : page,
+    ),
+  };
 }
 
 const mapPage = (doc: Doc, index: number, f: (page: Page) => Page): Doc => ({
@@ -160,22 +189,23 @@ export const useEditor = create<State>((set, get) => ({
     else get().commit(apply);
   },
 
-  reshapePanel: (id, shape, isLive) => {
+  reshapePanel: (id, shape, crop) => {
     const apply = (doc: Doc) =>
       mapPage(doc, get().pageIndex, (page) => {
         const panel = page.panels.find((p) => p.id === id);
         if (!panel) return page;
-        const from = bounds(panel.shape);
-        const to = bounds(shape);
+        const was = bounds(panel.shape);
+        const now = bounds(shape);
         return {
           ...page,
-          panels: page.panels.map((p) => (p.id === id ? { ...p, shape } : p)),
+          // `crop` is only given while the detection is being fixed, when the
+          // frame and the piece of page it shows have to move together.
+          panels: page.panels.map((p) => (p.id === id ? { ...p, shape, ...(crop ? { from: crop } : {}) } : p)),
           // Words spoken in this panel move and scale with it.
-          bubbles: page.bubbles.map((b) => (b.panelId === id ? carry(b, from, to) : b)),
+          bubbles: page.bubbles.map((b) => (b.panelId === id ? carry(b, was, now) : b)),
         };
       });
-    if (isLive) get().live(apply);
-    else get().commit(apply);
+    get().commit(apply);
   },
 
   updateBubble: (id, patch, isLive) => {
@@ -251,7 +281,7 @@ export const useEditor = create<State>((set, get) => ({
   openComic: async (id) => {
     const found = await readComic(id);
     if (!found) return;
-    const doc = await sliced(found);
+    const doc = sliced(found);
     set({ doc, pageIndex: 0, selection: null, past: [], future: [] });
     if (doc !== found) void save(doc, set);
   },
@@ -274,7 +304,7 @@ export const useEditor = create<State>((set, get) => ({
           width,
           height,
           background: "#ffffff",
-          art,
+          source: art,
           panels: found.panels,
           bubbles: found.bubbles,
         },
@@ -316,7 +346,7 @@ export const useEditor = create<State>((set, get) => ({
     const library = await readIndex();
     const found = library[0] ? await readComic(library[0].id) : undefined;
     if (!found?.pages?.length) return set({ library, loaded: true });
-    const doc = await sliced(found);
+    const doc = sliced(found);
     set({ doc, library, loaded: true });
     if (doc !== found) void save(doc, set);
   },

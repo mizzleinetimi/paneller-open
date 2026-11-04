@@ -11,9 +11,13 @@ export type Panel = {
   /** Closed polygon in page coordinates, clockwise from the top left. */
   shape: Point[];
   /**
-   * The art this panel holds, drawn to fill whatever box the panel occupies
-   * now - so moving or resizing the panel carries its picture with it.
+   * The part of the page's own picture this panel shows. Kept separate from
+   * the frame so the two can be moved independently: adjusting what was
+   * detected changes both together and recovers edges the detection clipped,
+   * while moving the panel afterwards carries the same crop to a new place.
    */
+  from?: { x: number; y: number; width: number; height: number };
+  /** Art of its own, once a panel has been redrawn. Takes the place of `from`. */
   art?: { src: string };
   /** What this panel was planned as: the line of script it was drawn from. */
   script?: string;
@@ -71,8 +75,10 @@ export type Page = {
   width: number;
   height: number;
   background: string;
-  /** The page as it arrived, drawn under everything. Set when a page is read in. */
+  /** The page as it arrived, drawn under everything, before panels were found. */
   art?: string;
+  /** The drawn page the panels take their pictures from. */
+  source?: string;
   panels: Panel[];
   bubbles: Bubble[];
   plan?: PageMemo;
@@ -191,7 +197,8 @@ export function emptyPage(width = 1280, height = 1920): Page {
 }
 
 /** A page has something on it once it, or any of its panels, holds art. */
-export const hasArt = (page: Page): boolean => Boolean(page.art) || page.panels.some((p) => p.art);
+export const hasArt = (page: Page): boolean =>
+  Boolean(page.art) || Boolean(page.source) || page.panels.some((p) => p.art);
 
 export const emptyDoc = (): Doc => ({ id: newId("comic"), title: "Untitled comic", pages: [emptyPage()] });
 

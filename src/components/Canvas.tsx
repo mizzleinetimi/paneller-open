@@ -38,7 +38,8 @@ function PanelShape({
   selected,
   index,
   zoom,
-  onPageArt,
+  source,
+  adjusting,
   onZoom,
   onDropOn,
 }: {
@@ -46,8 +47,10 @@ function PanelShape({
   selected: boolean;
   index: number;
   zoom: number;
-  /** The page still has one flat picture under the panels. */
-  onPageArt: boolean;
+  /** The drawn page panels take their pictures from. */
+  source?: HTMLImageElement;
+  /** Fixing what was detected: corners move the crop as well as the frame. */
+  adjusting: boolean;
   onZoom: (to: { x: number; y: number; width: number; height: number }) => void;
   /** Where a panel was let go. True if it landed on another and they traded. */
   onDropOn: (id: string, at: { x: number; y: number }) => boolean;
@@ -71,9 +74,10 @@ function PanelShape({
     const { x, y } = e.target.position();
     e.target.position({ x: 0, y: 0 });
     if (!x && !y) return;
-    const loose = e.evt.altKey;
+    // While the detection is being fixed, a panel stays where it is.
+    if (adjusting) return;
     const swapped = onDropOn(panel.id, { x: box.x + box.width / 2 + x, y: box.y + box.height / 2 + y });
-    if (!swapped && loose) reshapePanel(panel.id, shift(panel.shape, x, y));
+    if (!swapped && e.evt.altKey) reshapePanel(panel.id, shift(panel.shape, x, y));
   };
 
   /**
@@ -93,7 +97,7 @@ function PanelShape({
       width: Math.max(min, Math.abs(at.x - anchor.x)),
       height: Math.max(min, Math.abs(at.y - anchor.y)),
     };
-    reshapePanel(panel.id, reshape(panel.shape, to));
+    reshapePanel(panel.id, reshape(panel.shape, to), adjusting ? to : undefined);
   };
 
   const line = selected ? "var(--accent)" : "#111111";
@@ -115,19 +119,40 @@ function PanelShape({
           ctx.closePath();
         }}
       >
-        {/* Only stand in for art when there is none underneath either. */}
-        {!art && !onPageArt && (
+        {!art && !source && (
           <Rect x={box.x} y={box.y} width={box.width} height={box.height} fill="#e9e4d8" />
         )}
-        {art && <KImage image={art} x={box.x} y={box.y} width={box.width} height={box.height} />}
+        {/* Its own art once redrawn; otherwise its piece of the drawn page. */}
+        {art ? (
+          <KImage image={art} x={box.x} y={box.y} width={box.width} height={box.height} />
+        ) : (
+          source && (
+            <KImage
+              image={source}
+              crop={panel.from}
+              x={box.x}
+              y={box.y}
+              width={box.width}
+              height={box.height}
+            />
+          )
+        )}
       </Group>
 
-      <Line points={flatten(panel.shape)} closed stroke={line} strokeWidth={selected ? 7 / zoom + 2 : 4} />
+      <Line
+        points={flatten(panel.shape)}
+        closed
+        stroke={adjusting ? "var(--accent)" : line}
+        strokeWidth={selected || adjusting ? 7 / zoom + 2 : 4}
+        dash={adjusting && !selected ? [10 / zoom, 6 / zoom] : undefined}
+      />
 
-      {selected && (
+      {(selected || adjusting) && (
         <>
-          {/* A wash over the panel, so which one is picked is never in doubt. */}
-          <Line points={flatten(panel.shape)} closed fill="var(--accent)" opacity={0.12} listening={false} />
+          {selected && (
+            /* A wash over the panel, so which one is picked is never in doubt. */
+            <Line points={flatten(panel.shape)} closed fill="var(--accent)" opacity={0.12} listening={false} />
+          )}
           <Label x={box.x} y={box.y} offsetY={26 / zoom} listening={false}>
             <Tag fill="var(--accent)" cornerRadius={3 / zoom} />
             <Text
@@ -300,10 +325,17 @@ const MIN_ZOOM = 0.08;
 const MAX_ZOOM = 6;
 const clamp = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
-export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.Stage | null> }) {
+export default function Canvas({
+  stageRef,
+  adjusting = false,
+}: {
+  stageRef: React.RefObject<Konva.Stage | null>;
+  adjusting?: boolean;
+}) {
   const { selection, select } = useEditor();
   const page = useEditor((s) => s.doc.pages[s.pageIndex]);
   const pageArt = useImage(page.art);
+  const sourceArt = useImage(page.source);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   // No view means "show the whole page": it is worked out while rendering from
@@ -430,7 +462,8 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
               panel={panel}
               index={i}
               zoom={current.zoom}
-              onPageArt={Boolean(page.art)}
+              source={sourceArt}
+              adjusting={adjusting}
               onZoom={(box) => frame(box, 24)}
               onDropOn={dropPanel}
               selected={selection?.kind === "panel" && selection.id === panel.id}

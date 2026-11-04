@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
 import { CONTINUE_STAGES, MAKE_STAGES, Pipeline, type Stage } from "./Pipeline";
 import { hasArt } from "@/lib/doc";
-import { sliceIntoPanels } from "@/lib/slice";
+import { tidyPanels } from "@/lib/tidy";
 import { useEditor } from "@/lib/store";
 
 // Konva draws to a canvas and needs a window, so it must not be prerendered.
@@ -357,6 +357,7 @@ export default function Editor() {
   const [notice, setNotice] = useState<string | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [shelf, setShelf] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
 
   const {
     addBubble, undo, redo, remove, selection, past, future, restore, loaded, doc, openPage,
@@ -423,7 +424,7 @@ export default function Editor() {
           { label: "Finding speech bubbles, captions and sound effects", by: "SAM 3.1", seconds: 12 },
         ],
       );
-      if (found) openPage(src, width, height, found);
+      if (found) openPage(src, width, height, { ...found, panels: tidyPanels(found.panels, width, height) });
     } catch (e) {
       setProblem(e instanceof Error ? e.message : "Could not read that page.");
     }
@@ -455,28 +456,17 @@ export default function Editor() {
     if (!out) return;
     const img = new window.Image();
     img.onload = () => {
-      void (async () => {
-        const cut = await sliceIntoPanels({
-          id: "",
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          background: "#ffffff",
-          art: out.image,
-          panels: out.panels,
-          bubbles: out.bubbles,
-        });
-        const made = {
-          art: cut.art,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          panels: cut.panels,
-          bubbles: out.bubbles,
-          plan: out.plan,
-        };
-        if (carryOn) appendPage(made);
-        else if (out.story) startStory(out.story, made);
-        else openPage(out.image, img.naturalWidth, img.naturalHeight, out);
-      })();
+      const made = {
+        source: out.image,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        // Square the detection up before anyone sees it.
+        panels: tidyPanels(out.panels, img.naturalWidth, img.naturalHeight),
+        bubbles: out.bubbles,
+        plan: out.plan,
+      };
+      if (carryOn) appendPage(made);
+      else startStory(out.story ?? { title: doc.title, setting: "", cast: [], style: "classic" }, made);
     };
     img.src = out.image;
   };
@@ -595,6 +585,18 @@ export default function Editor() {
             </Group>
 
             <Divider />
+            <Group label="Panels">
+              <button
+                className={`btn ${adjusting ? "btn-key" : "btn-hollow"}`}
+                onClick={() => setAdjusting((v) => !v)}
+                disabled={working}
+                title="Drag panel corners to cover the whole frame"
+              >
+                {adjusting ? "Done adjusting" : "Adjust panels"}
+              </button>
+            </Group>
+
+            <Divider />
             <Group label="Edit">
               <button className="btn btn-hollow" onClick={undo} disabled={!past.length || working}>Undo</button>
               <button className="btn btn-hollow" onClick={redo} disabled={!future.length || working}>Redo</button>
@@ -638,7 +640,7 @@ export default function Editor() {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative flex min-w-0 flex-1 flex-col bg-[var(--paper-2)]">
-          {!loaded ? null : started ? <div className="min-h-0 flex-1"><Canvas stageRef={stageRef} /></div> : (
+          {!loaded ? null : started ? <div className="min-h-0 flex-1"><Canvas stageRef={stageRef} adjusting={adjusting} /></div> : (
             <Start onDraw={() => setDrawing(true)} onOpen={() => fileRef.current?.click()} />
           )}
 
@@ -691,13 +693,27 @@ export default function Editor() {
           {!selection && <StoryPanel />}
           {!selection && (
             <div className="flex flex-col gap-2 p-4 text-[13px] leading-snug text-ink-soft">
-              <p>Click a panel to redraw it, or a bubble to change what it says.</p>
+              {adjusting ? (
+                <>
+                  <p className="font-bold text-ink">Fixing what was detected.</p>
+                  <p>
+                    Drag a panel&apos;s corners until its frame covers the whole picture. Finding a
+                    panel tends to land just inside its border, so a little is usually missing on
+                    each side.
+                  </p>
+                  <p>Panels stay where they are until you are done.</p>
+                </>
+              ) : (
+                <>
+                  <p>Click a panel to redraw it, or a bubble to change what it says.</p>
               <p>
                 Drag one panel onto another and they trade places, lettering and all, with the page
                 keeping its shape. Hold <span className="font-bold text-ink">alt</span> while
                 dragging to put a panel wherever you like instead.
               </p>
-              <p>Drag a corner to resize. Double-click to zoom in. Cmd+Z undoes.</p>
+                  <p>Drag a corner to resize. Double-click to zoom in. Cmd+Z undoes.</p>
+                </>
+              )}
             </div>
           )}
           <div className="mt-auto border-t border-[var(--rule)] p-4 text-[12px] leading-snug text-ink-faint">
