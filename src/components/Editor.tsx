@@ -690,9 +690,14 @@ export default function Editor() {
           {selection?.kind === "panel" && <PanelInspector busy={working} onRedraw={(p) => void redraw(p)} />}
           {!selection && <StoryPanel />}
           {!selection && (
-            <div className="p-4 text-[13px] leading-snug text-ink-soft">
-              Click a panel to redraw it, or a bubble to change what it says. Drag to move. Cmd+Z
-              undoes.
+            <div className="flex flex-col gap-2 p-4 text-[13px] leading-snug text-ink-soft">
+              <p>Click a panel to redraw it, or a bubble to change what it says.</p>
+              <p>
+                Drag one panel onto another and they trade places, lettering and all, with the page
+                keeping its shape. Hold <span className="font-bold text-ink">alt</span> while
+                dragging to put a panel wherever you like instead.
+              </p>
+              <p>Drag a corner to resize. Double-click to zoom in. Cmd+Z undoes.</p>
             </div>
           )}
           <div className="mt-auto border-t border-[var(--rule)] p-4 text-[12px] leading-snug text-ink-faint">

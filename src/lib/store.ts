@@ -15,7 +15,10 @@ import {
   type Panel,
   type ComicSummary,
   type Selection,
+  type Point,
   type Story,
+  bounds,
+  carry,
   emptyDoc,
   newBubble,
   newId,
@@ -41,6 +44,8 @@ type State = {
   select: (selection: Selection) => void;
 
   updatePanel: (id: string, patch: Partial<Panel>, live?: boolean) => void;
+  /** Reshapes a panel and carries its lettering with it. */
+  reshapePanel: (id: string, shape: Point[], live?: boolean) => void;
   updateBubble: (id: string, patch: Partial<Bubble>, live?: boolean) => void;
   addBubble: (kind: BubbleKind) => void;
   remove: (selection: NonNullable<Selection>) => void;
@@ -155,6 +160,24 @@ export const useEditor = create<State>((set, get) => ({
     else get().commit(apply);
   },
 
+  reshapePanel: (id, shape, isLive) => {
+    const apply = (doc: Doc) =>
+      mapPage(doc, get().pageIndex, (page) => {
+        const panel = page.panels.find((p) => p.id === id);
+        if (!panel) return page;
+        const from = bounds(panel.shape);
+        const to = bounds(shape);
+        return {
+          ...page,
+          panels: page.panels.map((p) => (p.id === id ? { ...p, shape } : p)),
+          // Words spoken in this panel move and scale with it.
+          bubbles: page.bubbles.map((b) => (b.panelId === id ? carry(b, from, to) : b)),
+        };
+      });
+    if (isLive) get().live(apply);
+    else get().commit(apply);
+  },
+
   updateBubble: (id, patch, isLive) => {
     const apply = (doc: Doc) =>
       mapPage(doc, get().pageIndex, (page) => ({
@@ -192,8 +215,11 @@ export const useEditor = create<State>((set, get) => ({
         const first = page.panels.find((p) => p.id === a);
         const second = page.panels.find((p) => p.id === b);
         if (!first || !second) return page;
-        // The frames stay where they are; what is drawn in them trades places,
-        // along with the script that goes with it.
+        const boxA = bounds(first.shape);
+        const boxB = bounds(second.shape);
+        // The frames stay where they are, which is what keeps a page tidy; what
+        // is drawn in them trades places, along with the script behind it and
+        // the words spoken in it.
         return {
           ...page,
           panels: page.panels.map((p) =>
@@ -202,6 +228,13 @@ export const useEditor = create<State>((set, get) => ({
               : p.id === b
                 ? { ...p, art: first.art, script: first.script, said: first.said }
                 : p,
+          ),
+          bubbles: page.bubbles.map((bubble) =>
+            bubble.panelId === a
+              ? { ...carry(bubble, boxA, boxB), panelId: b }
+              : bubble.panelId === b
+                ? { ...carry(bubble, boxB, boxA), panelId: a }
+                : bubble,
           ),
         };
       }),

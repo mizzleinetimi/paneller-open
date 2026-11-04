@@ -52,21 +52,28 @@ function PanelShape({
   /** Where a panel was let go. True if it landed on another and they traded. */
   onDropOn: (id: string, at: { x: number; y: number }) => boolean;
 }) {
-  const { select, updatePanel } = useEditor();
+  const { select, reshapePanel } = useEditor();
   const art = useImage(panel.art?.src);
   const box = useMemo(() => bounds(panel.shape), [panel.shape]);
   const groupRef = useRef<Konva.Group>(null);
 
   // The polygon lives in page coordinates, so after a drag we fold the offset
   // back into the points and put the group back at the origin.
+  /**
+   * Dragging a panel re-orders the page rather than scattering it.
+   *
+   * Dropped on another panel, the two trade what they hold and both frames
+   * stay where they are, so the page keeps its shape. Dropped anywhere else it
+   * springs back - a page of panels drifting wherever they were let go is not
+   * a comic. Hold alt to put one somewhere of your own choosing.
+   */
   const onDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const { x, y } = e.target.position();
     e.target.position({ x: 0, y: 0 });
     if (!x && !y) return;
-    // Dropped on top of another panel, the two trade what they hold and this
-    // one goes back where it was: a swap is not also a move.
+    const loose = e.evt.altKey;
     const swapped = onDropOn(panel.id, { x: box.x + box.width / 2 + x, y: box.y + box.height / 2 + y });
-    if (!swapped) updatePanel(panel.id, { shape: shift(panel.shape, x, y) });
+    if (!swapped && loose) reshapePanel(panel.id, shift(panel.shape, x, y));
   };
 
   /**
@@ -86,7 +93,7 @@ function PanelShape({
       width: Math.max(min, Math.abs(at.x - anchor.x)),
       height: Math.max(min, Math.abs(at.y - anchor.y)),
     };
-    updatePanel(panel.id, { shape: reshape(panel.shape, to) });
+    reshapePanel(panel.id, reshape(panel.shape, to));
   };
 
   const line = selected ? "var(--accent)" : "#111111";

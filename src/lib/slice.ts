@@ -49,6 +49,17 @@ export async function sliceIntoPanels(page: Page): Promise<Page> {
     return { ...panel, art: { src: cut(img, box) } };
   });
 
+  // Lettering made before bubbles belonged to panels is matched to whichever
+  // panel it sits inside, so it travels with that panel from now on.
+  const bubbles = page.bubbles.map((b) => {
+    if (b.panelId) return b;
+    const owner = panels.find((panel) => {
+      const box = bounds(panel.shape);
+      return b.x >= box.x && b.x <= box.x + box.width && b.y >= box.y && b.y <= box.y + box.height;
+    });
+    return owner ? { ...b, panelId: owner.id } : b;
+  });
+
   // The gutters keep the page's own colour, as they do in print.
-  return { ...page, panels, art: undefined };
+  return { ...page, panels, bubbles, art: undefined };
 }

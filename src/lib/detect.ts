@@ -8,7 +8,7 @@ import "server-only";
 
 import { decodeMaskToSVGPath } from "@meta-sam/parser";
 import sharp from "sharp";
-import { type Bubble, type BubbleKind, type Panel, type Point, newId, rectShape } from "./doc";
+import { type Bubble, type BubbleKind, type Panel, type Point, bounds, newId, rectShape } from "./doc";
 import { boxesOf, masksOf, segment } from "./meta/sam";
 import { maskToPolygon, snapToBox } from "./trace";
 
@@ -174,12 +174,22 @@ export async function detectPage(image: string): Promise<Detected> {
         )
       : keptSfx.map(() => undefined);
 
+  const ordered = readingOrder(panels, boxes);
+  /** The panel a piece of lettering sits inside, if any. */
+  const owner = (box: Box) => {
+    const mid = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+    return ordered.find((panel) => {
+      const b = bounds(panel.shape);
+      return mid.x >= b.x && mid.x <= b.x + b.width && mid.y >= b.y && mid.y <= b.y + b.height;
+    })?.id;
+  };
+
   return {
-    panels: readingOrder(panels, boxes),
+    panels: ordered,
     bubbles: [
-      ...keptSpeech.map((s) => bubbleFrom("speech", s.box)),
-      ...keptSfx.map((s, i) => bubbleFrom("sfx", s.box, clears[i])),
-      ...keptCaption.map((c) => bubbleFrom("caption", c.box)),
+      ...keptSpeech.map((s) => ({ ...bubbleFrom("speech", s.box), panelId: owner(s.box) })),
+      ...keptSfx.map((s, i) => ({ ...bubbleFrom("sfx", s.box, clears[i]), panelId: owner(s.box) })),
+      ...keptCaption.map((c) => ({ ...bubbleFrom("caption", c.box), panelId: owner(c.box) })),
     ],
     counts: {
       panels: panelShapes.length,

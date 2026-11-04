@@ -48,6 +48,7 @@ function sizeFor(text: string, kind: "speech" | "caption" | "sfx", panel: Box): 
 }
 
 export function letterPanel(panel: Panel, said: PagePlan["panels"][number], speaker: Box | undefined): Bubble[] {
+  const belongs = { panelId: panel.id };
   const box = bounds(panel.shape);
   const b: Box = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
   const pad = Math.min(box.width, box.height) * 0.06;
@@ -58,6 +59,7 @@ export function letterPanel(panel: Panel, said: PagePlan["panels"][number], spea
     const m = measure(said.caption, "caption", fontSize);
     out.push({
       id: newId("bubble"),
+      ...belongs,
       kind: "caption",
       x: b.left + pad + m.width / 2,
       y: b.top + pad + m.height / 2,
@@ -81,6 +83,7 @@ export function letterPanel(panel: Panel, said: PagePlan["panels"][number], spea
       : { x: (b.left + b.right) / 2, y: b.bottom - box.height * 0.25 };
     out.push({
       id: newId("bubble"),
+      ...belongs,
       kind: "speech",
       x,
       y,
@@ -95,6 +98,7 @@ export function letterPanel(panel: Panel, said: PagePlan["panels"][number], spea
     const m = measure(said.sfx, "sfx", fontSize);
     out.push({
       id: newId("bubble"),
+      ...belongs,
       kind: "sfx",
       x: (b.left + b.right) / 2,
       y: b.bottom - pad - m.height / 2,

@@ -28,6 +28,12 @@ export type BubbleKind = "speech" | "caption" | "sfx";
 export type Bubble = {
   id: string;
   kind: BubbleKind;
+  /**
+   * The panel this belongs to. Lettering belongs to the picture it is spoken
+   * in, so when that panel moves, is resized, or trades places with another,
+   * its words go with it.
+   */
+  panelId?: string;
   /** The bubble's centre, so that it grows evenly as its text changes. */
   x: number;
   y: number;
@@ -125,6 +131,39 @@ export function reshape(
     x: to.x + (p.x - from.x) * sx,
     y: to.y + (p.y - from.y) * sy,
   }));
+}
+
+/** Maps a point from one box onto another, keeping where it sat within it. */
+export function remap(
+  p: Point,
+  from: { x: number; y: number; width: number; height: number },
+  to: { x: number; y: number; width: number; height: number },
+): Point {
+  const sx = from.width === 0 ? 1 : to.width / from.width;
+  const sy = from.height === 0 ? 1 : to.height / from.height;
+  return { x: to.x + (p.x - from.x) * sx, y: to.y + (p.y - from.y) * sy };
+}
+
+/** Carries a bubble from one panel's box into another's. */
+export function carry(
+  bubble: Bubble,
+  from: { x: number; y: number; width: number; height: number },
+  to: { x: number; y: number; width: number; height: number },
+): Bubble {
+  const scale = Math.min(
+    from.width === 0 ? 1 : to.width / from.width,
+    from.height === 0 ? 1 : to.height / from.height,
+  );
+  const moved = remap({ x: bubble.x, y: bubble.y }, from, to);
+  return {
+    ...bubble,
+    x: moved.x,
+    y: moved.y,
+    fontSize: Math.max(9, Math.round(bubble.fontSize * scale)),
+    ...(bubble.width !== undefined ? { width: bubble.width * scale } : {}),
+    ...(bubble.height !== undefined ? { height: bubble.height * scale } : {}),
+    ...(bubble.tail ? { tail: remap(bubble.tail, from, to) } : {}),
+  };
 }
 
 /** Moves a polygon by an offset. */
