@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo_Black, Bangers, Comic_Neue, Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Paneller's type: Inter to read in, Archivo Black to shout, Bangers for comic
+// headings, Comic Neue for lettering inside a balloon.
+const body = Inter({ variable: "--font-body", subsets: ["latin"] });
+const display = Archivo_Black({ variable: "--font-display", subsets: ["latin"], weight: "400" });
+const comic = Bangers({ variable: "--font-comic", subsets: ["latin"], weight: "400" });
+const letter = Comic_Neue({ variable: "--font-letter", subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata: Metadata = {
   title: "Paneller Open",
@@ -22,9 +19,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${body.variable} ${display.variable} ${comic.variable} ${letter.variable} antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );
 }

@@ -17,8 +17,8 @@ const LANGUAGES = ["Yoruba", "Spanish", "Japanese", "French", "Arabic", "Hindi",
 const STYLE_NAMES = ["classic", "manga", "noir", "soft"];
 
 const Wordmark = () => (
-  <span className="select-none text-[15px] font-semibold tracking-tight">
-    Paneller <span className="hollow font-bold">Open</span>
+  <span className="masthead select-none pr-1 text-[26px] leading-none">
+    <span className="masthead-solid">Paneller</span> Open
   </span>
 );
 
@@ -190,20 +190,20 @@ function DrawDialog({
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-[11px] text-ink-faint">
             Panels
-            <select className="btn ml-1.5" value={panels} onChange={(e) => setPanels(Number(e.target.value))}>
+            <select className="btn btn-hollow ml-1.5" value={panels} onChange={(e) => setPanels(Number(e.target.value))}>
               {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
           {!continuing && (
             <label className="text-[11px] text-ink-faint">
               Style
-              <select className="btn ml-1.5" value={style} onChange={(e) => setStyle(e.target.value)}>
+              <select className="btn btn-hollow ml-1.5" value={style} onChange={(e) => setStyle(e.target.value)}>
                 {STYLE_NAMES.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
           )}
           <span className="flex-1" />
-          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-hollow" onClick={onClose}>Cancel</button>
           <button className="btn btn-key" onClick={go} disabled={busy || !idea.trim()}>
             {continuing ? "Draw the next page" : "Draw the page"}
           </button>
@@ -218,20 +218,20 @@ function Start({ onDraw, onOpen }: { onDraw: () => void; onOpen: () => void }) {
   return (
     <div className="grid h-full place-items-center p-8">
       <div className="w-full max-w-2xl">
-        <h1 className="text-[22px] font-semibold tracking-tight">A comic you can take apart.</h1>
+        <h1 className="comic text-[40px] leading-[0.95]">A comic you can take apart.</h1>
         <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Pages are drawn with no lettering on them, and the words go on top as objects. Nothing is
           ever flattened: every panel can be redrawn and every line rewritten or translated.
         </p>
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
-          <button onClick={onDraw} className="dashed group rounded-md p-5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-wash)]">
+          <button onClick={onDraw} className="card-hollow p-5 text-left transition-colors hover:border-[var(--accent)]">
             <span className="block text-sm font-medium">Draw a page from an idea</span>
             <span className="mt-1.5 block text-[13px] leading-snug text-ink-soft">
               Muse Spark plans the panels and writes the dialogue, Muse Image draws it, SAM 3.1 finds
               the panels. About a minute.
             </span>
           </button>
-          <button onClick={onOpen} className="dashed group rounded-md p-5 text-left transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-wash)]">
+          <button onClick={onOpen} className="card-hollow p-5 text-left transition-colors hover:border-[var(--accent)]">
             <span className="block text-sm font-medium">Open a page you already have</span>
             <span className="mt-1.5 block text-[13px] leading-snug text-ink-soft">
               SAM 3.1 finds its panels and bubbles, Muse Spark reads the words out, and you can
@@ -429,21 +429,21 @@ export default function Editor() {
           <button className="btn btn-key" onClick={() => setDrawing((d) => !d)} disabled={working}>
             {carryOn ? "Next page" : "Draw a page"}
           </button>
-          <button className="btn" onClick={() => fileRef.current?.click()} disabled={working}>Open a page</button>
+          <button className="btn btn-hollow" onClick={() => fileRef.current?.click()} disabled={working}>Open a page</button>
         </Group>
 
         {started && (
           <>
             <Divider />
             <Group label="Letter">
-              <button className="btn" onClick={() => addBubble("speech")} disabled={working}>Speech</button>
-              <button className="btn" onClick={() => addBubble("caption")} disabled={working}>Caption</button>
-              <button className="btn" onClick={() => addBubble("sfx")} disabled={working}>Sound</button>
-              <button className="btn" onClick={() => void readLettering()} disabled={!page.art || !page.bubbles.length || working}>
+              <button className="btn btn-hollow" onClick={() => addBubble("speech")} disabled={working}>Speech</button>
+              <button className="btn btn-hollow" onClick={() => addBubble("caption")} disabled={working}>Caption</button>
+              <button className="btn btn-hollow" onClick={() => addBubble("sfx")} disabled={working}>Sound</button>
+              <button className="btn btn-hollow" onClick={() => void readLettering()} disabled={!page.art || !page.bubbles.length || working}>
                 Read lettering
               </button>
               <select
-                className="btn"
+                className="btn btn-hollow"
                 value=""
                 disabled={!page.bubbles.some((b) => b.text) || working}
                 onChange={(e) => e.target.value && void translate(e.target.value)}
@@ -455,16 +455,16 @@ export default function Editor() {
 
             <Divider />
             <Group label="Edit">
-              <button className="btn" onClick={undo} disabled={!past.length || working}>Undo</button>
-              <button className="btn" onClick={redo} disabled={!future.length || working}>Redo</button>
-              <button className="btn" onClick={() => selection && remove(selection)} disabled={!selection || working}>Delete</button>
+              <button className="btn btn-hollow" onClick={undo} disabled={!past.length || working}>Undo</button>
+              <button className="btn btn-hollow" onClick={redo} disabled={!future.length || working}>Redo</button>
+              <button className="btn btn-hollow" onClick={() => selection && remove(selection)} disabled={!selection || working}>Delete</button>
             </Group>
           </>
         )}
 
         <span className="flex-1" />
         {problem && <span className="max-w-xs truncate text-[13px] text-[var(--warn)]" title={problem}>{problem}</span>}
-        {started && <button className="btn" onClick={exportPng} disabled={working}>Export PNG</button>}
+        {started && <button className="btn btn-hollow" onClick={exportPng} disabled={working}>Export PNG</button>}
 
         {drawing && (
           <DrawDialog
@@ -477,7 +477,7 @@ export default function Editor() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <main className="relative flex min-w-0 flex-1 flex-col bg-[var(--paper-sunk)]">
+        <main className="relative flex min-w-0 flex-1 flex-col bg-[var(--paper-2)]">
           {!loaded ? null : started ? <div className="min-h-0 flex-1"><Canvas stageRef={stageRef} /></div> : (
             <Start onDraw={() => setDrawing(true)} onOpen={() => fileRef.current?.click()} />
           )}
@@ -489,21 +489,21 @@ export default function Editor() {
                 <button
                   key={p.id}
                   onClick={() => goToPage(i)}
-                  className={`h-7 w-7 rounded border text-xs ${
+                  className={`h-7 w-7 rounded border-2 text-xs font-bold ${
                     i === pageIndex
-                      ? "border-[var(--accent)] text-[var(--accent)]"
-                      : "border-[var(--rule-strong)] text-ink-soft hover:bg-[var(--paper-sunk)]"
+                      ? "border-[var(--line)] bg-[var(--accent)] text-white"
+                      : "border-[var(--rule)] text-ink-soft hover:border-[var(--line)]"
                   }`}
                 >
                   {i + 1}
                 </button>
               ))}
               {carryOn && (
-                <button className="btn ml-1" onClick={() => setDrawing(true)} disabled={working}>+ Page</button>
+                <button className="btn btn-hollow ml-1" onClick={() => setDrawing(true)} disabled={working}>+ Page</button>
               )}
               <span className="flex-1" />
               {doc.pages.length > 1 && (
-                <button className="btn" onClick={() => removePage(pageIndex)} disabled={working}>
+                <button className="btn btn-hollow" onClick={() => removePage(pageIndex)} disabled={working}>
                   Remove page {pageIndex + 1}
                 </button>
               )}
@@ -537,7 +537,7 @@ export default function Editor() {
           )}
           <div className="mt-auto border-t border-[var(--rule)] p-4 text-[12px] leading-snug text-ink-faint">
             This is the open core of{" "}
-            <a href="https://panellr.com" target="_blank" rel="noreferrer" className="text-[var(--accent)] underline underline-offset-2">
+            <a href="https://panellr.com" target="_blank" rel="noreferrer" className="font-bold text-[var(--accent)] underline underline-offset-2">
               Paneller
             </a>
             , which draws whole comics with your characters kept consistent across pages.

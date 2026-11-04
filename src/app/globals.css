@@ -1,111 +1,148 @@
 @import "tailwindcss";
 
 /*
- * Paneller Open is the open core, and it should look like one: paper and ink,
- * drawn in outline, with the colour left out. Nothing here is filled in that
- * does not have to be - buttons are rules around space, the wordmark's "Open"
- * is hollow letters - because that is what this is next to the full product.
+ * Paneller Open wears Paneller's brand with the colour left out.
+ *
+ * The product is a printed comic: cream newsprint, heavy ink lines, hard
+ * offset shadows, Ben-Day dots, a masthead in yellow with an inked extrusion
+ * behind it. This is the same comic at the pencil stage - the same paper, the
+ * same lines, the same shadows, and the fill not yet dropped in. The masthead
+ * is the brand's own treatment with its colour removed: outline only.
+ *
+ * Brand values (paper, ink, accent, highlight, the 2px line and the hard
+ * shadow) are Paneller's and are matched on purpose. None of the product's
+ * code is here.
  */
 
 :root {
-  --paper: #fbfaf8;
-  --paper-sunk: #f1efea;
+  --paper: #fbf7ef;
+  --paper-2: #f3ecdf;
   --paper-raised: #ffffff;
-  --ink: #17160f;
-  --ink-soft: #6c6961;
-  --ink-faint: #9b978e;
-  --rule: #ded9d0;
-  --rule-strong: #c6c0b4;
-  --accent: #2b4cff;
-  --accent-wash: #eceeff;
-  --warn: #b3261e;
+  --ink: #1b1a17;
+  --ink-soft: #5d5850;
+  --ink-faint: #918a7e;
+  --line: #1b1a17;
+  --rule: #d9d1c0;
+  --accent: #e8573c;
+  --accent-ink: #ffffff;
+  --highlight: #ffd84d;
+  --danger: #b42318;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #121210;
-    --paper-sunk: #0c0c0a;
-    --paper-raised: #1b1a17;
-    --ink: #f3f0e8;
-    --ink-soft: #9a968c;
-    --ink-faint: #6d6a62;
-    --rule: #2f2d28;
-    --rule-strong: #45423a;
-    --accent: #8fa0ff;
-    --accent-wash: #1a1d33;
-    --warn: #f2998f;
+    --paper: #16150f;
+    --paper-2: #100f0b;
+    --paper-raised: #201e18;
+    --ink: #f6efe1;
+    --ink-soft: #a39c8e;
+    --ink-faint: #736d61;
+    --line: #f6efe1;
+    --rule: #3a362d;
+    --accent: #ff7c63;
+    --highlight: #ffd84d;
+    --danger: #f2998f;
   }
 }
 
 @theme inline {
   --color-paper: var(--paper);
-  --color-paper-sunk: var(--paper-sunk);
+  --color-paper-2: var(--paper-2);
   --color-paper-raised: var(--paper-raised);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-ink-faint: var(--ink-faint);
   --color-rule: var(--rule);
-  --color-rule-strong: var(--rule-strong);
   --color-accent: var(--accent);
-  --color-accent-wash: var(--accent-wash);
-  --color-warn: var(--warn);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-highlight: var(--highlight);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-comic: var(--font-comic);
+  --font-letter: var(--font-letter);
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* ── Outline-first controls ──────────────────────────────── */
+/* ─── Controls: inked, and pressable ───────────── */
 
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  border: 1px solid var(--rule-strong);
-  background: transparent;
-  color: var(--ink);
-  border-radius: 0.3rem;
-  padding: 0.34rem 0.66rem;
+  border: 2px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.34rem 0.7rem;
   font-size: 0.8125rem;
-  line-height: 1.2;
+  font-weight: 700;
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--line);
+  transition: transform 0.08s, box-shadow 0.08s;
+  cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
-.btn:hover:not(:disabled) { background: var(--paper-sunk); border-color: var(--ink-soft); }
-.btn:disabled { opacity: 0.38; cursor: not-allowed; }
-.btn-key { border-color: var(--accent); color: var(--accent); }
-.btn-key:hover:not(:disabled) { background: var(--accent-wash); border-color: var(--accent); }
+.btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--line); }
+.btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--line); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: 2px 2px 0 var(--rule); }
+.btn-key { background: var(--accent); color: var(--accent-ink); }
+
+/*
+ * The open core gets the outline and not the fill: no paper behind it, and the
+ * shadow drawn as a rule rather than a block.
+ */
+.btn-hollow { background: transparent; box-shadow: 2px 2px 0 var(--rule); }
 
 .field {
   width: 100%;
-  border: 1px solid var(--rule-strong);
+  border: 2px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
   background: var(--paper-raised);
   color: var(--ink);
-  border-radius: 0.3rem;
-  padding: 0.5rem 0.6rem;
   font-size: 0.875rem;
   resize: none;
 }
 .field::placeholder { color: var(--ink-faint); }
-.field:focus { outline: none; border-color: var(--accent); }
+.field:focus { outline: 3px solid var(--highlight); outline-offset: 1px; }
 
 .label {
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-comic), system-ui;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
   color: var(--ink-faint);
 }
 
-/* The wordmark: the product solid, the open part hollow. */
-.hollow {
-  color: transparent;
-  -webkit-text-stroke: 1px var(--ink-soft);
-  paint-order: stroke fill;
-}
+.card { border: 2px solid var(--line); border-radius: 0.7rem; background: var(--paper-raised); box-shadow: 4px 4px 0 var(--line); }
+.card-hollow { border: 2px dashed var(--rule); border-radius: 0.7rem; background: transparent; }
 
-/* An area with nothing in it yet reads as ruled-out space, not as a hole. */
-.dashed { border: 1px dashed var(--rule-strong); }
+/* ─── Brand type ───────────────────────────────── */
+
+.comic { font-family: var(--font-comic), system-ui; font-weight: 400; letter-spacing: 0.02em; }
+
+/*
+ * The masthead, un-inked. Paneller's own is yellow with a stepped ink
+ * extrusion behind it; here the fill is gone and only the outline is drawn.
+ */
+.masthead {
+  font-family: var(--font-comic), system-ui;
+  line-height: 0.86;
+  letter-spacing: 0.01em;
+  color: transparent;
+  -webkit-text-stroke: 0.045em var(--ink);
+  paint-order: stroke fill;
+  transform: skew(-7deg) rotate(-1.5deg);
+  transform-origin: left bottom;
+}
+/* The product's half of the wordmark keeps its ink. */
+.masthead-solid { color: var(--ink); -webkit-text-stroke: 0.045em var(--ink); }
+
+/* ─── Print textures ───────────────────────────── */
+
+.dots { background-image: radial-gradient(var(--rule) 26%, transparent 28%); background-size: 11px 11px; }
+.halftone { background-image: radial-gradient(color-mix(in srgb, var(--ink) 12%, transparent) 1px, transparent 1.2px); background-size: 9px 9px; }

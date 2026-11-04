@@ -52,12 +52,8 @@ export function Pipeline({ stages, startedAt }: { stages: Stage[]; startedAt: nu
           return (
             <li key={stage.label} className="flex items-start gap-3">
               <span
-                className={`mt-[3px] h-3 w-3 shrink-0 rounded-full border ${
-                  now
-                    ? "animate-pulse border-[var(--accent)] bg-[var(--accent)]"
-                    : done
-                      ? "border-[var(--ink-soft)] bg-[var(--ink-soft)]"
-                      : "border-[var(--rule-strong)]"
+                className={`mt-[3px] h-3.5 w-3.5 shrink-0 rounded-full border-2 border-[var(--line)] ${
+                  now ? "animate-pulse bg-[var(--accent)]" : done ? "bg-[var(--ink)]" : "bg-transparent"
                 }`}
               />
               <span className="min-w-0">

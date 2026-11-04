@@ -215,7 +215,7 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) select(null);
       }}
-      className="flex h-full w-full items-center justify-center overflow-hidden bg-[var(--paper-sunk)]"
+      className="flex h-full w-full items-center justify-center overflow-hidden bg-[var(--paper-2)]"
     >
       <Stage
         ref={stageRef}

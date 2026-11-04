@@ -58,10 +58,12 @@ export function wrap(text: string, fontSize: number, family: string, maxWidth: n
   return lines.slice(0, maxLines);
 }
 
+// Paneller letters its balloons in Comic Neue and shouts in Bangers; the same
+// here, so a page drawn in one looks like a page drawn in the other.
 export const FAMILY = {
-  speech: '"Comic Sans MS", "Chalkboard SE", system-ui',
-  caption: 'Georgia, "Times New Roman", serif',
-  sfx: 'Impact, "Haettenschweiler", system-ui',
+  speech: '"Comic Neue", "Comic Sans MS", system-ui',
+  caption: '"Comic Neue", Georgia, serif',
+  sfx: 'Bangers, Impact, system-ui',
 } as const;
 
 /**
