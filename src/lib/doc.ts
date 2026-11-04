@@ -12,8 +12,12 @@ export type Panel = {
   shape: Point[];
   /** Art drawn inside the polygon, which clips it. */
   art?: { src: string; x: number; y: number; width: number; height: number };
-  /** The line of script this panel came from, if any. */
+  /** What this panel was planned as: the line of script it was drawn from. */
   script?: string;
+  /** Its weight on the page, as planned. */
+  size?: string;
+  /** What is said in it, if anything, and by whom. */
+  said?: { speech?: string; speaker?: string; sfx?: string; caption?: string };
 };
 
 export type BubbleKind = "speech" | "caption" | "sfx";

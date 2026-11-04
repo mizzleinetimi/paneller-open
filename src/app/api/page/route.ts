@@ -56,11 +56,29 @@ export async function POST(request: Request) {
     const found = await detectPage(image);
     const bubbles = await letterPage(image, found.panels, plan);
 
+    // Panels come back in reading order, which is the order they were planned
+    // in, so each one can carry the line of script it was drawn from.
+    const panels = found.panels.map((panel, i) => {
+      const said = plan.panels[i];
+      if (!said) return panel;
+      return {
+        ...panel,
+        script: said.description,
+        size: said.size,
+        said: {
+          ...(said.speech ? { speech: said.speech } : {}),
+          ...(said.speaker ? { speaker: said.speaker } : {}),
+          ...(said.sfx ? { sfx: said.sfx } : {}),
+          ...(said.caption ? { caption: said.caption } : {}),
+        },
+      };
+    });
+
     return Response.json({
       image,
       plan,
       story: bible ? { ...bible, style: styleName } : undefined,
-      panels: found.panels,
+      panels,
       bubbles,
       counts: { ...found.counts, lettered: bubbles.length },
     });

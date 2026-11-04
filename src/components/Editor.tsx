@@ -91,9 +91,40 @@ function BubbleInspector() {
 
 function PanelInspector({ busy, onRedraw }: { busy: boolean; onRedraw: (prompt: string) => void }) {
   const [prompt, setPrompt] = useState("");
+  const { selection, doc, pageIndex } = useEditor();
+  const page = doc.pages[pageIndex];
+  const index = page.panels.findIndex((p) => selection?.kind === "panel" && p.id === selection.id);
+  const panel = page.panels[index];
+  const said = panel?.said;
+
   return (
     <div className="flex flex-col gap-2.5 border-b border-[var(--rule)] p-4">
-      <span className="label">Redraw this panel</span>
+      <span className="label">
+        Panel {index + 1} of {page.panels.length}
+        {panel?.size ? ` · ${panel.size}` : ""}
+      </span>
+
+      {panel?.script ? (
+        <p className="text-[13px] leading-snug text-ink">{panel.script}</p>
+      ) : (
+        <p className="text-[13px] leading-snug text-ink-faint">
+          This panel was found on the page rather than planned, so there is no script behind it.
+        </p>
+      )}
+
+      {said && (said.speech || said.sfx || said.caption) && (
+        <ul className="flex flex-col gap-1 border-l-2 border-[var(--rule)] pl-2.5">
+          {said.caption && <li className="text-[12px] text-ink-soft">Caption: {said.caption}</li>}
+          {said.speech && (
+            <li className="text-[12px] text-ink-soft">
+              {said.speaker ?? "Someone"}: &ldquo;{said.speech}&rdquo;
+            </li>
+          )}
+          {said.sfx && <li className="text-[12px] text-ink-soft">Sound: {said.sfx}</li>}
+        </ul>
+      )}
+
+      <span className="label mt-1">Redraw this panel</span>
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
