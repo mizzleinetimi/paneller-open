@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Paneller Open is the open core, and it should look like one: paper and ink,
+ * drawn in outline, with the colour left out. Nothing here is filled in that
+ * does not have to be - buttons are rules around space, the wordmark's "Open"
+ * is hollow letters - because that is what this is next to the full product.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --paper: #fbfaf8;
+  --paper-sunk: #f1efea;
+  --paper-raised: #ffffff;
+  --ink: #17160f;
+  --ink-soft: #6c6961;
+  --ink-faint: #9b978e;
+  --rule: #ded9d0;
+  --rule-strong: #c6c0b4;
+  --accent: #2b4cff;
+  --accent-wash: #eceeff;
+  --warn: #b3261e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #121210;
+    --paper-sunk: #0c0c0a;
+    --paper-raised: #1b1a17;
+    --ink: #f3f0e8;
+    --ink-soft: #9a968c;
+    --ink-faint: #6d6a62;
+    --rule: #2f2d28;
+    --rule-strong: #45423a;
+    --accent: #8fa0ff;
+    --accent-wash: #1a1d33;
+    --warn: #f2998f;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-sunk: var(--paper-sunk);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Outline-first controls ──────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 0.3rem;
+  padding: 0.34rem 0.66rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.btn:hover:not(:disabled) { background: var(--paper-sunk); border-color: var(--ink-soft); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn-key { border-color: var(--accent); color: var(--accent); }
+.btn-key:hover:not(:disabled) { background: var(--accent-wash); border-color: var(--accent); }
+
+.field {
+  width: 100%;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+  color: var(--ink);
+  border-radius: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.875rem;
+  resize: none;
+}
+.field::placeholder { color: var(--ink-faint); }
+.field:focus { outline: none; border-color: var(--accent); }
+
+.label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* The wordmark: the product solid, the open part hollow. */
+.hollow {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--ink-soft);
+  paint-order: stroke fill;
+}
+
+/* An area with nothing in it yet reads as ruled-out space, not as a hole. */
+.dashed { border: 1px dashed var(--rule-strong); }

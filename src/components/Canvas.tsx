@@ -210,7 +210,13 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
   }, [page.width, page.height]);
 
   return (
-    <div ref={wrapRef} className="flex h-full w-full items-center justify-center overflow-hidden bg-neutral-200 dark:bg-neutral-900">
+    <div
+      ref={wrapRef}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) select(null);
+      }}
+      className="flex h-full w-full items-center justify-center overflow-hidden bg-[var(--paper-sunk)]"
+    >
       <Stage
         ref={stageRef}
         width={page.width * scale}
@@ -219,7 +225,7 @@ export default function Canvas({ stageRef }: { stageRef: React.RefObject<Konva.S
         onMouseDown={(e) => {
           if (e.target === e.target.getStage()) select(null);
         }}
-        className="shadow-xl"
+        className="shadow-[0_1px_3px_rgba(0,0,0,0.12),0_12px_32px_rgba(0,0,0,0.10)]"
       >
         <Layer>
           <Rect width={page.width} height={page.height} fill={page.background} />
