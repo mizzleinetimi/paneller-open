@@ -65,8 +65,15 @@ Where a panel has spoken words, also give "speaker": who says them, described by
 export async function planStory(
   idea: string,
   panels?: number,
+  /** Characters the reader brought, already described from their own pictures. */
+  known?: { who: string; look: string }[],
 ): Promise<{ bible: StoryBible; plan: PagePlan }> {
   const count = panels ? `exactly ${Math.min(panels, MAX_PANELS)}` : "between three and six";
+  const cast = known?.length
+    ? `- "cast": use exactly these characters, word for word, and no others. The story is about them:
+${known.map((c) => `  - who: "${c.who}", look: "${c.look}"`).join("\n")}`
+    : `- "cast": everyone who appears, each with "who" (their part in the story, such as "the tailor") and "look" (how they look, in the same two-to-five-word form the speakers use, such as "man in a green apron"). Give every character a look that tells them apart from the others at a glance - different clothing colours, not just different faces.`;
+
   const instruction = `Start a comic from this idea:
 
 "${idea}"
@@ -74,7 +81,7 @@ export async function planStory(
 First settle what carries through the whole comic:
 - "title": a short title.
 - "setting": the place and the time of day, in one line.
-- "cast": everyone who appears, each with "who" (their part in the story, such as "the tailor") and "look" (how they look, in the same two-to-five-word form the speakers use, such as "man in a green apron"). Give every character a look that tells them apart from the others at a glance - different clothing colours, not just different faces.
+${cast}
 
 Then plan the first page, with ${count} panels.
 
@@ -323,4 +330,26 @@ Reply with only a JSON array of ${bible.cast.length} strings, in the same order.
   } catch {
     return bible.cast; // The planned words are better than none.
   }
+}
+
+
+/** Describes characters on a sheet someone supplied, left to right. */
+export async function describeSheet(sheet: string, count: number): Promise<{ who: string; look: string }[]> {
+  const people = await askJson<{ who: string; look: string }[]>(
+    [
+      {
+        type: "text",
+        text: `This is a character sheet for a comic, showing ${count} character${
+          count === 1 ? "" : "s"
+        } side by side, left to right.
+
+For each one give "who" - a short part they could play in a story, such as "the tailor" or "the schoolgirl" - and "look": how they look in two to five words, by clothing and colour, as someone pointing at the sheet would say it: "man in a green apron", "girl in a yellow dress". No names, no pronouns: these are used to find each person in a picture, so they must tell them apart.
+
+Reply with only a JSON array of ${count} objects, left to right, no commentary.`,
+      },
+      { type: "image_url", image_url: { url: sheet } },
+    ],
+    { maxTokens: 4000 },
+  );
+  return people.slice(0, count);
 }

@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import type Konva from "konva";
-import { CONTINUE_STAGES, MAKE_STAGES, Pipeline, type Stage } from "./Pipeline";
+import { CONTINUE_STAGES, MAKE_STAGES, OWN_CAST_STAGES, Pipeline, type Stage } from "./Pipeline";
+import { asDataUrl, castSheetFrom } from "@/lib/cast";
 import { hasArt } from "@/lib/doc";
 import { tidyPanels } from "@/lib/tidy";
 import { useEditor } from "@/lib/store";
@@ -196,13 +197,21 @@ function DrawDialog({
 }: {
   busy: boolean;
   continuing?: { title: string; cast: { who: string; look: string }[] };
-  onDraw: (idea: string, panels: number, style: string) => void;
+  onDraw: (idea: string, panels: number, style: string, cast: string[]) => void;
   onClose: () => void;
 }) {
   const [idea, setIdea] = useState("");
   const [panels, setPanels] = useState(4);
   const [style, setStyle] = useState("classic");
-  const go = () => idea.trim() && onDraw(idea.trim(), panels, style);
+  const [cast, setCast] = useState<string[]>([]);
+  const castRef = useRef<HTMLInputElement>(null);
+  const go = () => idea.trim() && onDraw(idea.trim(), panels, style, cast);
+
+  const addCast = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const added = await Promise.all([...files].slice(0, 6).map(asDataUrl));
+    setCast((was) => [...was, ...added].slice(0, 6));
+  };
 
   return (
     <div className="absolute inset-x-0 top-full z-20 border-b border-[var(--rule)] bg-[var(--paper-raised)] px-4 py-4 shadow-sm">
@@ -231,6 +240,56 @@ function DrawDialog({
               : "a danfo driver in Lagos traffic argues with a conductor, then spots his old teacher through the window"
           }
         />
+        {!continuing && (
+          <div className="flex flex-col gap-2 rounded-md border-2 border-dashed border-[var(--rule)] p-3">
+            <div className="flex items-center gap-2">
+              <span className="label">Your own characters</span>
+              <span className="flex-1" />
+              <input
+                ref={castRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  void addCast(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button className="btn btn-hollow" onClick={() => castRef.current?.click()} disabled={cast.length >= 6}>
+                Add a character
+              </button>
+              {cast.length > 0 && (
+                <button className="btn btn-hollow" onClick={() => setCast([])}>Clear</button>
+              )}
+            </div>
+            {cast.length === 0 ? (
+              <p className="text-[12px] leading-snug text-ink-faint">
+                Optional. Add pictures of characters you already have and the comic is written and
+                drawn around them. Without any, the cast is invented and drawn for you.
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {cast.map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={src.slice(-24) + i}
+                      src={src}
+                      alt=""
+                      className="h-20 w-16 rounded border-2 border-[var(--line)] bg-[var(--paper-2)] object-cover"
+                    />
+                  ))}
+                </div>
+                <p className="text-[12px] leading-snug text-ink-faint">
+                  {cast.length} character{cast.length === 1 ? "" : "s"}. They go on one sheet, side by
+                  side, and every page is drawn against it.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-[11px] text-ink-faint">
             Panels
@@ -442,8 +501,11 @@ export default function Editor() {
     }
   };
 
-  const drawNewPage = async (idea: string, panels: number, style: string) => {
+  const drawNewPage = async (idea: string, panels: number, style: string, cast: string[] = []) => {
     setDrawing(false);
+    // Pictures of characters are laid out on one sheet before anything is sent:
+    // one reference, however many of them there are.
+    const sheet = cast.length ? await castSheetFrom(cast) : undefined;
     const out = await call<{
       image: string;
       plan: NonNullable<typeof page.plan>;
@@ -462,8 +524,8 @@ export default function Editor() {
             reference: [doc.pages[0]?.art, doc.pages[doc.pages.length - 1]?.art]
               .filter((art, i, all): art is string => Boolean(art) && all.indexOf(art) === i),
           }
-        : { idea, panels, style },
-      carryOn ? CONTINUE_STAGES : MAKE_STAGES,
+        : { idea, panels, style, ...(sheet ? { sheet, castCount: cast.length } : {}) },
+      carryOn ? CONTINUE_STAGES : sheet ? OWN_CAST_STAGES : MAKE_STAGES,
     );
     if (!out) return;
     const img = new window.Image();
@@ -643,7 +705,7 @@ export default function Editor() {
         {drawing && (
           <DrawDialog
             busy={working}
-            onDraw={(idea, panels, style) => void drawNewPage(idea, panels, style)}
+            onDraw={(idea, panels, style, cast) => void drawNewPage(idea, panels, style, cast)}
             onClose={() => setDrawing(false)}
             continuing={carryOn && doc.story ? { title: doc.story.title, cast: doc.story.cast } : undefined}
           />

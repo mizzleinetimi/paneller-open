@@ -2,6 +2,7 @@ import {
   STYLES,
   type PagePlan,
   type StoryBible,
+  describeSheet,
   drawCastSheet,
   drawPlan,
   planNextPage,
@@ -25,6 +26,10 @@ type Body = {
   reference?: string[];
   panels?: number;
   style?: string;
+  /** A cast sheet the reader supplied, made from their own pictures. */
+  sheet?: string;
+  /** How many characters are on it. */
+  castCount?: number;
 };
 
 /**
@@ -46,11 +51,14 @@ export async function POST(request: Request) {
       bible = body.story;
       plan = await planNextPage(body.story, body.soFar ?? [], body.what, body.panels);
     } else if (body.idea?.trim()) {
-      const started = await planStory(body.idea.trim(), body.panels);
+      // With a sheet of their own, the characters on it are read first and the
+      // story is planned around them rather than around invented people.
+      const known = body.sheet ? await describeSheet(body.sheet, body.castCount ?? 1) : undefined;
+      const started = await planStory(body.idea.trim(), body.panels, known);
       bible = started.bible;
       plan = started.plan;
-      // Draw the cast once, before any page, and hold every page against it.
-      bible.sheet = await drawCastSheet(bible, style);
+      // Draw the cast once, before any page, unless one was brought along.
+      bible.sheet = body.sheet ?? (await drawCastSheet(bible, style));
     } else {
       return Response.json({ error: "Say what the page is about." }, { status: 400 });
     }
@@ -65,7 +73,10 @@ export async function POST(request: Request) {
     // aiming balloons, so it happens while this page is being drawn.
     const [drawn, cast] = await Promise.all([
       drawPlan(plan, style, references.length ? { images: references, cast: bible.cast.map((c) => c.look) } : undefined),
-      bible.sheet && !body.what ? readCast(bible.sheet, bible) : Promise.resolve(bible.cast),
+      // A sheet the reader supplied has already been read; one we drew has not.
+      bible.sheet && !body.what && !body.sheet
+        ? readCast(bible.sheet, bible)
+        : Promise.resolve(bible.cast),
     ]);
     const { image, lostContinuity } = drawn;
     bible = { ...bible, cast };
@@ -103,7 +114,7 @@ export async function POST(request: Request) {
       ...(lostContinuity
         ? {
             warning:
-              "The models would not draw this page against the pages before it, so it was drawn from its description alone. The characters may not match.",
+              "The drawing model would not work from the cast sheet this time, so the page was drawn from its description alone. The characters may not match it.",
           }
         : {}),
     });
