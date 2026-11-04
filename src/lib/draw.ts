@@ -9,7 +9,7 @@ import "server-only";
 
 import sharp from "sharp";
 import { type Panel, bounds } from "./doc";
-import { attach, editImage, generateImage } from "./meta/client";
+import { editImage, generateImage } from "./meta/client";
 
 const dataUrl = (b64: string) => `data:image/webp;base64,${b64}`;
 const toBuffer = (image: string) => Buffer.from(image.replace(/^data:image\/\w+;base64,/, ""), "base64");
